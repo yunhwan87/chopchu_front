@@ -1,0 +1,15 @@
+# 이 프로젝트는 React Native (Expo) 기반으로 작성되었습니다.
+# 실제 의존성 관리는 package.json을 통해 이루어집니다.
+# 아래는 현재 시스템에 설치된 주요 패키지 목록입니다.
+
+@react-native-community/datetimepicker==8.4.4
+@react-navigation/bottom-tabs>=7.15.5
+@react-navigation/native>=7.1.33
+expo~=54.0.33
+expo-status-bar~=3.0.9
+lucide-react-native>=0.576.0
+react==19.1.0
+react-native==0.81.5
+react-native-safe-area-context~=5.6.0
+react-native-screens~=4.16.0
+react-native-svg==15.12.1

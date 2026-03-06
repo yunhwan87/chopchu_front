@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import {
   SafeAreaProvider,
@@ -76,11 +77,15 @@ const MOCK_DATA = {
   ],
 };
 
-function MainContent() {
+import { useAuth } from "./src/hooks/useAuth";
+import { TempProjectSelectorScreen } from "./screens/TempProjectSelectorScreen";
+
+function MainContent({ currentProject, onBackToProjects }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
   const [projects, setProjects] = useState(MOCK_DATA.projects);
+  const { logout } = useAuth();
 
   // 2. 탭에 따라 렌더링할 화면 연결 (기존 로직을 스크린 컴포넌트로 교체)
   const renderContent = () => {
@@ -91,12 +96,13 @@ function MainContent() {
             projects={projects}
             setProjects={setProjects}
             schedule={MOCK_DATA.schedule}
+            currentProject={currentProject}
           />
         );
       case "Schedule":
         return <ScheduleScreen projects={projects} schedule={MOCK_DATA.schedule} />;
       case "Location":
-        return <LocationScreen locations={locations} setLocations={setLocations} />;
+        return <LocationScreen project={currentProject} />;
       case "Communication":
         return <CommunicationScreen questions={MOCK_DATA.questions} />;
       default:
@@ -113,18 +119,20 @@ function MainContent() {
         <View>
           <Text style={styles.brandTitle}>OnSync</Text>
           <Text style={styles.headerSubtitle}>
-            {activeTab === "Dashboard"
-              ? "프로젝트 대시보드"
-              : activeTab === "Schedule"
-                ? "전체 촬영 일정"
-                : activeTab === "Location"
-                  ? "장소 섭외 현황"
-                  : "팀 커뮤니케이션"}
+            {currentProject ? currentProject.title : "프로젝트 대시보드"}
           </Text>
         </View>
-        <TouchableOpacity style={styles.profileCircle}>
-          <Text style={styles.profileText}>김제작</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.profileCircle, { backgroundColor: '#F1F5F9' }]}
+            onPress={onBackToProjects}
+          >
+            <Text style={[styles.profileText, { color: '#4F46E5' }]}>목록</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.profileCircle} onPress={logout}>
+            <Text style={styles.profileText}>로그아웃</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ flex: 1 }}>{renderContent()}</View>
@@ -175,14 +183,28 @@ const TabItem = ({ icon, label, active, onPress }) => (
 );
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { user, loading } = useAuth();
+  const [currentProject, setCurrentProject] = useState(null);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
-      {isLoggedIn ? (
-        <MainContent />
+      {!user ? (
+        <AuthScreen />
+      ) : !currentProject ? (
+        <TempProjectSelectorScreen onSelectProject={setCurrentProject} />
       ) : (
-        <AuthScreen onLogin={() => setIsLoggedIn(true)} />
+        <MainContent
+          currentProject={currentProject}
+          onBackToProjects={() => setCurrentProject(null)}
+        />
       )}
     </SafeAreaProvider>
   );

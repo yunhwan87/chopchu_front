@@ -1,20 +1,41 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { useAuth } from "../src/hooks/useAuth";
 
 export const LoginForm = ({ onLogin }) => {
+    const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const { login, register, loading } = useAuth();
 
-    const handleLogin = () => {
-        // 실제 서비스에서는 여기에 인증 로직이 들어갑니다.
-        // 현재는 이메일이나 비밀번호 검증 없이 무조건 로그인 되도록 구현합니다.
-        onLogin();
+    const handleSubmit = async () => {
+        if (!email || !password) {
+            Alert.alert("알림", "이메일과 비밀번호를 입력해주세요.");
+            return;
+        }
+
+        const result = isLogin
+            ? await login(email, password)
+            : await register(email, password);
+
+        if (result.success) {
+            if (isLogin) {
+                onLogin();
+            } else {
+                Alert.alert("성공", "회원가입이 완료되었습니다. 이제 로그인해주세요.");
+                setIsLogin(true);
+            }
+        } else {
+            Alert.alert("오류", result.error);
+        }
     };
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>로그인하여 시작하기</Text>
-            <Text style={styles.subtitle}>OnSync 데이터에 접근하려면 로그인하세요.</Text>
+            <Text style={styles.title}>{isLogin ? "로그인하여 시작하기" : "새 계정 만들기"}</Text>
+            <Text style={styles.subtitle}>
+                {isLogin ? "OnSync 데이터에 접근하려면 로그인하세요." : "정보를 입력하여 가입하세요."}
+            </Text>
 
             <TextInput
                 style={styles.input}
@@ -24,6 +45,7 @@ export const LoginForm = ({ onLogin }) => {
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                editable={!loading}
             />
             <TextInput
                 style={styles.input}
@@ -32,10 +54,19 @@ export const LoginForm = ({ onLogin }) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                editable={!loading}
             />
 
-            <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                <Text style={styles.buttonText}>로그인</Text>
+            <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={loading}
+            >
+                {loading ? (
+                    <ActivityIndicator color="#FFF" />
+                ) : (
+                    <Text style={styles.buttonText}>{isLogin ? "로그인" : "회원가입"}</Text>
+                )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.forgotPassword}>
@@ -43,9 +74,11 @@ export const LoginForm = ({ onLogin }) => {
             </TouchableOpacity>
 
             <View style={styles.footerRow}>
-                <Text style={styles.footerText}>계정이 없으신가요?</Text>
-                <TouchableOpacity>
-                    <Text style={styles.footerLink}>회원가입</Text>
+                <Text style={styles.footerText}>
+                    {isLogin ? "계정이 없으신가요?" : "이미 계정이 있으신가요?"}
+                </Text>
+                <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+                    <Text style={styles.footerLink}>{isLogin ? "회원가입" : "로그인"}</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -96,6 +129,9 @@ const styles = StyleSheet.create({
         color: "#FFF",
         fontSize: 16,
         fontWeight: "700",
+    },
+    buttonDisabled: {
+        backgroundColor: "#A5B4FC",
     },
     forgotPassword: {
         alignItems: "center",

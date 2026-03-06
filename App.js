@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
   Modal,
 } from "react-native";
 import {
@@ -179,11 +180,14 @@ const MOCK_DATA = {
   ],
 };
 
-function MainContent({ onLogout }) {
+import { useAuth } from "./src/hooks/useAuth";
+import { TempProjectSelectorScreen } from "./screens/TempProjectSelectorScreen";
+function MainContent({ onLogout, currentProject, onBackToProjects }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
   const [projects, setProjects] = useState(MOCK_DATA.projects);
+  const { logout } = useAuth();
   const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -199,6 +203,7 @@ function MainContent({ onLogout }) {
             projects={projects}
             setProjects={setProjects}
             schedule={MOCK_DATA.schedule}
+            currentProject={currentProject}
             setActiveTab={setActiveTab}
             setExpandedProjId={setExpandedProjId}
           />
@@ -214,7 +219,7 @@ function MainContent({ onLogout }) {
           />
         );
       case "Location":
-        return <LocationScreen locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />;
+        return <LocationScreen project={currentProject} locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />;
       case "Communication":
         return <CommunicationScreen questions={MOCK_DATA.questions} />;
       default:
@@ -231,14 +236,19 @@ function MainContent({ onLogout }) {
         <View>
           <Text style={styles.brandTitle}>OnSync</Text>
           <Text style={styles.headerSubtitle}>
-            {activeTab === "Dashboard"
-              ? "프로젝트 대시보드"
-              : activeTab === "Schedule"
-                ? "전체 촬영 일정"
-                : activeTab === "Location"
-                  ? "장소 섭외 현황"
-                  : "팀 커뮤니케이션"}
+            {currentProject ? currentProject.title : "프로젝트 대시보드"}
           </Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.profileCircle, { backgroundColor: '#F1F5F9' }]}
+            onPress={onBackToProjects}
+          >
+            <Text style={[styles.profileText, { color: '#4F46E5' }]}>목록</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.profileCircle} onPress={logout}>
+            <Text style={styles.profileText}>로그아웃</Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.profileCircle} onPress={() => setMenuVisible(true)}>
           <Text style={styles.profileText}>김제작</Text>
@@ -310,16 +320,28 @@ const TabItem = ({ icon, label, active, onPress }) => (
 );
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // 편의상 메인으로 시작 (원하면 false 변경)
+  const { user, loading } = useAuth();
+  const [currentProject, setCurrentProject] = useState(null);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
-      {/* 로그인, 로딩 추후 사용 삭제금지!!!
-          사용자 요청에 따라 로그아웃 기능을 살리기 위해 주석을 해제합니다 */}
-      {isLoggedIn ? (
-        <MainContent onLogout={() => setIsLoggedIn(false)} />
+      {!user ? (
+        <AuthScreen />
+      ) : !currentProject ? (
+        <TempProjectSelectorScreen onSelectProject={setCurrentProject} />
       ) : (
-        <AuthScreen onLogin={() => setIsLoggedIn(true)} />
+        <MainContent
+          currentProject={currentProject}
+          onBackToProjects={() => setCurrentProject(null)}
+        />
       )}
     </SafeAreaProvider>
   );

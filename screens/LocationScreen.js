@@ -12,7 +12,7 @@ import { useLocations } from '../src/hooks/useLocations';
 import { Plus, MapPin, Clock, DollarSign, ChevronRight } from 'lucide-react-native';
 import { LocationForm } from '../components/LocationForm';
 
-export const LocationScreen = ({ project, locations, setLocations, schedule, setSchedule }) => {
+export const LocationScreen = ({ project, locations2, setLocations, schedule, setSchedule }) => {
   const { locations, loading, fetchLocations } = useLocations(project?.id);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -129,7 +129,7 @@ export const LocationScreen = ({ project, locations, setLocations, schedule, set
           }}
         />
       </Modal>
-      <LocationManager locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />
+      <LocationManager locations={locations2} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />
     </View>
   );
 };

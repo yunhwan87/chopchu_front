@@ -6,16 +6,17 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import {
-  LayoutDashboard,
-  Calendar,
-  MapPin,
-  MessageSquare,
+  Home,
+  List,
+  Map,
+  Bell,
 } from "lucide-react-native";
 
 // 1. 분리된 스크린 컴포넌트 임포트 (경로 확인 완료)
@@ -38,6 +39,61 @@ const MOCK_DATA = {
       note: "주요 패션위크 촬영 건",
       risks: 2,
       pendingQuestions: 3,
+    },
+    {
+      id: 2,
+      title: "뉴욕 FW 캠페인",
+      members: "이촬영, 김제작",
+      totalDays: 5,
+      startDate: "2026-05-15",
+      endDate: "2026-05-19",
+      note: "브루클린 야외 로케이션 포함",
+      risks: 1,
+      pendingQuestions: 1,
+    },
+    {
+      id: 3,
+      title: "서울 상반기 화보",
+      members: "최조명, 박현장",
+      totalDays: 2,
+      startDate: "2026-06-01",
+      endDate: "2026-06-02",
+      note: "스튜디오 및 근교 야외 촬영",
+      risks: 0,
+      pendingQuestions: 5,
+    },
+    {
+      id: 4,
+      title: "도쿄 스트릿 룩북",
+      members: "홍길동",
+      totalDays: 4,
+      startDate: "2026-06-20",
+      endDate: "2026-06-23",
+      note: "거리 촬영 허가 건 확인 필요",
+      risks: 3,
+      pendingQuestions: 2,
+    },
+    {
+      id: 5,
+      title: "여름 리조트 컬렉션",
+      members: "김제작, 최조명, 강모델",
+      totalDays: 5,
+      startDate: "2026-07-10",
+      endDate: "2026-07-14",
+      note: "제주도 해변 로케이션",
+      risks: 0,
+      pendingQuestions: 0,
+    },
+    {
+      id: 6,
+      title: "가을/겨울 선공개",
+      members: "박현장",
+      totalDays: 1,
+      startDate: "2026-08-05",
+      endDate: "2026-08-05",
+      note: "실내 스튜디오",
+      risks: 1,
+      pendingQuestions: 1,
     }
   ],
   schedule: [
@@ -47,6 +103,7 @@ const MOCK_DATA = {
       location: "에펠탑 광장",
       status: "확정",
       type: "촬영",
+      date: "2026-04-10"
     },
     {
       id: 2,
@@ -54,11 +111,57 @@ const MOCK_DATA = {
       location: "루브르 박물관 내부",
       status: "섭외 중",
       type: "촬영",
+      date: "2026-04-10"
     },
+    {
+      id: 3,
+      time: "15:30",
+      location: "센강 유람선",
+      status: "초안",
+      type: "이동/촬영",
+      date: "2026-04-11"
+    },
+    {
+      id: 4,
+      time: "18:00",
+      location: "개선문 디너 장소",
+      status: "확정",
+      type: "식사",
+      date: "2026-04-11"
+    },
+    {
+      id: 5,
+      time: "19:30",
+      location: "몽마르뜨 언덕",
+      status: "섭외 중",
+      type: "촬영",
+      date: "2026-04-12"
+    },
+    {
+      id: 6,
+      time: "21:00",
+      location: "호텔 세트장",
+      status: "확정",
+      type: "휴식",
+      date: "2026-04-12"
+    },
+    {
+      id: 7,
+      time: "10:00",
+      location: "베르사유 궁전",
+      status: "섭외 중",
+      type: "예비",
+      date: "2026-04-15" // 이 일정은 프로젝트 기간 밖으로 두어 필터링 테스트용으로 씀
+    }
   ],
   locations: [
-    { id: 1, name: "에펠탑 광장", status: "확정", cost: "€1,200" },
-    { id: 2, name: "루브르 박물관", status: "섭외 중", cost: "미정" },
+    { id: 1, name: "에펠탑 광장", status: "확정", cost: "€1,200", date: "2026-04-10" },
+    { id: 2, name: "루브르 박물관", status: "섭외 중", cost: "미정", date: "2026-04-10" },
+    { id: 3, name: "브루클린 다리", status: "요청중", cost: "$500", date: "2026-05-15" },
+    { id: 4, name: "강남 A 스튜디오", status: "확정", cost: "₩1,000,000", date: "2026-06-01" },
+    { id: 5, name: "제주 중문 해변", status: "확정", cost: "₩300,000", date: "2026-07-10" },
+    { id: 6, name: "시부야 교차로", status: "섭외 중", cost: "¥50,000", date: "2026-06-20" },
+    { id: 7, name: "센강 유람선", status: "요청중", cost: "미정", date: "2026-04-11" }
   ],
   questions: [
     {
@@ -79,13 +182,17 @@ const MOCK_DATA = {
 
 import { useAuth } from "./src/hooks/useAuth";
 import { TempProjectSelectorScreen } from "./screens/TempProjectSelectorScreen";
-
-function MainContent({ currentProject, onBackToProjects }) {
+function MainContent({ onLogout, currentProject, onBackToProjects }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
   const [projects, setProjects] = useState(MOCK_DATA.projects);
   const { logout } = useAuth();
+  const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  // 메인 탭(ScheduleScreen)에서 열려있을 프로젝트 ID 상태
+  const [expandedProjId, setExpandedProjId] = useState(null);
 
   // 2. 탭에 따라 렌더링할 화면 연결 (기존 로직을 스크린 컴포넌트로 교체)
   const renderContent = () => {
@@ -97,12 +204,22 @@ function MainContent({ currentProject, onBackToProjects }) {
             setProjects={setProjects}
             schedule={MOCK_DATA.schedule}
             currentProject={currentProject}
+            setActiveTab={setActiveTab}
+            setExpandedProjId={setExpandedProjId}
           />
         );
       case "Schedule":
-        return <ScheduleScreen projects={projects} schedule={MOCK_DATA.schedule} />;
+        return (
+          <ScheduleScreen
+            projects={projects}
+            setProjects={setProjects}
+            schedule={schedule}
+            expandedProjId={expandedProjId}
+            setExpandedProjId={setExpandedProjId}
+          />
+        );
       case "Location":
-        return <LocationScreen project={currentProject} />;
+        return <LocationScreen project={currentProject} locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />;
       case "Communication":
         return <CommunicationScreen questions={MOCK_DATA.questions} />;
       default:
@@ -133,9 +250,29 @@ function MainContent({ currentProject, onBackToProjects }) {
             <Text style={styles.profileText}>로그아웃</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity style={styles.profileCircle} onPress={() => setMenuVisible(true)}>
+          <Text style={styles.profileText}>김제작</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={{ flex: 1 }}>{renderContent()}</View>
+
+      {/* 프로필 메뉴 모달 */}
+      <Modal visible={menuVisible} transparent={true} animationType="fade">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+          <View style={styles.menuContent}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                if (onLogout) onLogout();
+              }}
+            >
+              <Text style={styles.menuItemText}>로그아웃</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* 하단 탭 네비게이션 */}
       <View
@@ -145,26 +282,26 @@ function MainContent({ currentProject, onBackToProjects }) {
         ]}
       >
         <TabItem
-          icon={<LayoutDashboard size={24} />}
-          label="대시보드"
+          icon={<Home size={24} />}
+          label="홈"
           active={activeTab === "Dashboard"}
           onPress={() => setActiveTab("Dashboard")}
         />
         <TabItem
-          icon={<Calendar size={24} />}
-          label="전체일정"
+          icon={<List size={24} />}
+          label="메인"
           active={activeTab === "Schedule"}
           onPress={() => setActiveTab("Schedule")}
         />
         <TabItem
-          icon={<MapPin size={24} />}
-          label="섭외관리"
+          icon={<Map size={24} />}
+          label="섭외"
           active={activeTab === "Location"}
           onPress={() => setActiveTab("Location")}
         />
         <TabItem
-          icon={<MessageSquare size={24} />}
-          label="커뮤니케이션"
+          icon={<Bell size={24} />}
+          label="요청"
           active={activeTab === "Communication"}
           onPress={() => setActiveTab("Communication")}
         />
@@ -256,4 +393,32 @@ const styles = StyleSheet.create({
   },
   tabItem: { alignItems: "center" },
   tabLabel: { fontSize: 11, fontWeight: "700", marginTop: 5 },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+  },
+  menuContent: {
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    marginTop: 70, // 헤더 높이 근처
+    marginRight: 20,
+    width: 120,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  menuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  menuItemText: {
+    color: "#EF4444",
+    fontSize: 15,
+    fontWeight: "700",
+  },
 });

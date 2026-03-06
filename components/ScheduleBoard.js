@@ -1,8 +1,16 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Clock, CheckCircle2 } from "lucide-react-native";
 
-export const ScheduleBoard = ({ schedule }) => {
+export const ScheduleBoard = ({ schedule, onCancelRequest }) => {
+  if (!schedule || schedule.length === 0) {
+    return (
+      <View style={{ padding: 20, alignItems: "center" }}>
+        <Text style={{ color: "#9CA3AF" }}>해당 기간 내 예정된 일정이 없습니다.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {schedule.map((item, index) => (
@@ -23,19 +31,27 @@ export const ScheduleBoard = ({ schedule }) => {
                   : styles.borderDraft,
             ]}
           >
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.timelineLocation}>{item.location}</Text>
               <View style={styles.statusRow}>
                 <Clock size={12} color="#64748B" />
                 <Text style={styles.statusLabel}>
-                  {item.status} · {item.type}
+                  {item.date} {item.time} · {item.type}
                 </Text>
               </View>
             </View>
-            <CheckCircle2
-              size={22}
-              color={item.status === "확정" ? "#10B981" : "#D1D5DB"}
-            />
+            <View style={{ alignItems: "center", gap: 8 }}>
+              <CheckCircle2
+                size={22}
+                color={item.status === "확정" ? "#10B981" : "#D1D5DB"}
+              />
+              <TouchableOpacity
+                onPress={() => onCancelRequest && onCancelRequest(item.id)}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelBtnText}>취소요청</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       ))}
@@ -76,5 +92,16 @@ const styles = StyleSheet.create({
     gap: 5,
     marginTop: 5,
   },
-  statusLabel: { fontSize: 13, color: "#64748B" },
+  statusLabel: { fontSize: 13, color: "#64748B", fontWeight: "600" },
+  cancelBtn: {
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  cancelBtnText: {
+    color: "#EF4444",
+    fontSize: 11,
+    fontWeight: "700",
+  }
 });

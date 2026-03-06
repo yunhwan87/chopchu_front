@@ -1,80 +1,323 @@
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity } from "react-native";
-import { Folder, Calendar } from "lucide-react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, Platform, Alert } from "react-native";
+import { Edit2, X } from "lucide-react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
 
-export const ScheduleScreen = ({ projects = [], schedule = [] }) => {
-  const [selectedProject, setSelectedProject] = useState(projects[0] || null);
+export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expandedProjId, setExpandedProjId }) => {
+  const scrollViewRef = useRef(null);
+  const [cardLayouts, setCardLayouts] = useState({});
+  const [dayFilter, setDayFilter] = useState("전체");
+
+  useEffect(() => {
+    if (expandedProjId && cardLayouts[expandedProjId] !== undefined) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: cardLayouts[expandedProjId], animated: true });
+      }, 50);
+    }
+  }, [expandedProjId, cardLayouts]);
+
+  useEffect(() => {
+    setDayFilter("전체");
+  }, [expandedProjId]);
+
+  const getDDay = (startDateStr) => {
+    if (!startDateStr) return "";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startObj = new Date(startDateStr);
+    startObj.setHours(0, 0, 0, 0);
+    const diffTime = startObj - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "D-Day";
+    if (diffDays > 0) return `D-${diffDays}`;
+    return `D+${Math.abs(diffDays)}`;
+  };
+
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+
+  const [formTitle, setFormTitle] = useState("");
+  const [formMembers, setFormMembers] = useState("");
+  const [formNote, setFormNote] = useState("");
+
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerType, setPickerType] = useState("start");
+
+  const openEditModal = (proj) => {
+    setEditingProject(proj);
+    setFormTitle(proj.title);
+    setFormMembers(proj.members || "");
+    setFormNote(proj.note || "");
+
+    // Parse dates
+    const startObj = proj.startDate ? new Date(proj.startDate) : new Date();
+    const endObj = proj.endDate ? new Date(proj.endDate) : new Date();
+    setStartDate(isNaN(startObj) ? new Date() : startObj);
+    setEndDate(isNaN(endObj) ? new Date() : endObj);
+
+    setEditModalVisible(true);
+  };
+
+  const formatDate = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const onChangeDate = (event, selectedDate) => {
+    if (Platform.OS === "android") setShowPicker(false);
+    if (event.type === "dismissed") {
+      setShowPicker(false);
+      return;
+    }
+    if (selectedDate) {
+      if (pickerType === "start") setStartDate(selectedDate);
+      else setEndDate(selectedDate);
+    }
+  };
+
+  const handleSave = () => {
+    if (!formTitle.trim()) return;
+
+    // Calculate days
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    let totalDays = 0;
+    if (endDay >= startDay) {
+      const diffTime = Math.abs(endDay - startDay);
+      totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+
+    const updatedProject = {
+      ...editingProject,
+      title: formTitle,
+      members: formMembers,
+      note: formNote,
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+      totalDays
+    };
+
+    setProjects(projects.map(p => p.id === editingProject.id ? updatedProject : p));
+    setEditModalVisible(false);
+  };
+
+  const displayedProjects = expandedProjId
+    ? projects.filter(p => p.id === expandedProjId)
+    : [];
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>전체 일정 관리</Text>
+      <Text style={styles.headerTitle}>선택된 프로젝트 상세일정</Text>
 
-      {/* Project Horizontal Card List */}
-      <View style={styles.projectListContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
-          {projects.map((proj) => {
-            const isSelected = selectedProject?.id === proj.id;
-            return (
-              <TouchableOpacity
-                key={proj.id}
-                onPress={() => setSelectedProject(proj)}
-                style={[
-                  styles.projectCard,
-                  isSelected && styles.projectCardSelected,
-                ]}
-              >
-                <View style={styles.iconRow}>
-                  <Folder size={18} color={isSelected ? "#FFF" : "#6366F1"} />
-                </View>
-                <Text style={[styles.projTitle, isSelected && { color: "#FFF" }]} numberOfLines={1}>
-                  {proj.title}
-                </Text>
-                <Text style={[styles.projDates, isSelected && { color: "#E0E7FF" }]}>
-                  {proj.startDate} ~ {proj.endDate}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Selected Project Details and Schedule */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollInner}>
-        {selectedProject ? (
-          <>
-            <View style={styles.detailCard}>
+      <ScrollView
+        ref={scrollViewRef}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollInner}
+      >
+        {displayedProjects.length > 0 ? (
+          displayedProjects.map((proj) => (
+            <View
+              key={proj.id}
+              style={styles.detailCard}
+              onLayout={(e) => {
+                const layout = e.nativeEvent.layout;
+                setCardLayouts((prev) => ({ ...prev, [proj.id]: layout.y }));
+              }}
+            >
               <View style={styles.detailHeader}>
-                <Text style={styles.detailTitle}>{selectedProject.title}</Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>총 {selectedProject.totalDays}일</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.detailTitle}>{proj.title}</Text>
+                </View>
+                <TouchableOpacity onPress={() => openEditModal(proj)} style={styles.editBtn}>
+                  <Edit2 size={18} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.detailSubTextRow}>
+                <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]}>
+                  진행 기간: {proj.startDate} ~ {proj.endDate}
+                </Text>
+                <View style={styles.inlineBadge}>
+                  <Text style={styles.inlineBadgeText}>총 {proj.totalDays}일</Text>
                 </View>
               </View>
 
-              {selectedProject.members ? (
-                <Text style={styles.detailSubText}>
-                  참여 인원: {selectedProject.members}
-                </Text>
-              ) : null}
-
-              {selectedProject.note ? (
-                <View style={styles.noteBox}>
-                  <Text style={styles.noteText}>{selectedProject.note}</Text>
+              {proj.members ? (
+                <View style={styles.detailSubTextRow}>
+                  <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]} numberOfLines={1}>
+                    참여 인원: {proj.members}
+                  </Text>
+                  <View style={styles.inlineBadge}>
+                    <Text style={styles.inlineBadgeText}>
+                      총 {proj.members.split(',').filter(m => m.trim().length > 0).length}명
+                    </Text>
+                  </View>
                 </View>
               ) : null}
-            </View>
 
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>촬영 일정 보드</Text>
+              {proj.note ? (
+                <View style={styles.noteBox}>
+                  <Text style={styles.noteText}>{proj.note}</Text>
+                </View>
+              ) : null}
+
+              {/* 클릭 시 하단에 타임라인 보드 펼쳐짐 */}
+              {expandedProjId === proj.id && (
+                <View style={styles.timelineWrapper}>
+                  <View style={[styles.sectionHeader, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
+                    <Text style={styles.sectionTitle}>촬영 일정 보드</Text>
+                    <View style={styles.dDayBadge}>
+                      <Text style={styles.dDayText}>{getDDay(proj.startDate)}</Text>
+                    </View>
+                  </View>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 15, paddingBottom: 5 }}>
+                    {["전체", ...Array.from({ length: proj.totalDays }, (_, i) => `${i + 1}일차`)].map(day => (
+                      <TouchableOpacity
+                        key={day}
+                        style={[styles.filterTab, dayFilter === day && styles.filterTabActive]}
+                        onPress={() => setDayFilter(day)}
+                      >
+                        <Text style={[styles.filterTabText, dayFilter === day && styles.filterTabTextActive]}>{day}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <ScheduleBoard
+                    schedule={schedule.filter(item => {
+                      if (!item.date || !proj.startDate || !proj.endDate) return false;
+                      const itemDate = new Date(item.date);
+                      const sDate = new Date(proj.startDate);
+                      const eDate = new Date(proj.endDate);
+                      let isInRange = itemDate >= sDate && itemDate <= eDate;
+
+                      if (isInRange && dayFilter !== "전체") {
+                        const dayNum = parseInt(dayFilter.replace("일차", ""));
+                        const targetDate = new Date(sDate);
+                        targetDate.setDate(targetDate.getDate() + (dayNum - 1));
+                        if (formatDate(itemDate) !== formatDate(targetDate)) {
+                          isInRange = false;
+                        }
+                      }
+                      return isInRange;
+                    }).sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))}
+                    onCancelRequest={(id) => {
+                      Alert.alert("취소 요청", "해당 일정에 대해 취소 요청을 접수하시겠습니까?", [
+                        { text: "아니오", style: "cancel" },
+                        { text: "예", onPress: () => Alert.alert("안내", "취소 요청이 접수되었습니다.") }
+                      ]);
+                    }}
+                  />
+                </View>
+              )}
             </View>
-            <ScheduleBoard schedule={schedule} />
-          </>
+          ))
         ) : (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>선택된 프로젝트가 없습니다.</Text>
+            <Text style={styles.emptyText}>홈 화면에서 조회할 프로젝트를 선택해주세요.</Text>
           </View>
         )}
+
       </ScrollView>
+
+      {/* 수정 모달 */}
+      <Modal visible={editModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>프로젝트 수정</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>프로젝트명</Text>
+              <TextInput
+                style={styles.input}
+                value={formTitle}
+                onChangeText={setFormTitle}
+                placeholder="예: 파리 패션위크 촬영"
+                placeholderTextColor="#9CA3AF"
+              />
+
+              <Text style={styles.label}>참여 인원</Text>
+              <TextInput
+                style={styles.input}
+                value={formMembers}
+                onChangeText={setFormMembers}
+                placeholder="이름을 콤마(,)로 구분"
+                placeholderTextColor="#9CA3AF"
+              />
+
+              <Text style={styles.label}>기간 설정</Text>
+              <View style={styles.dateRow}>
+                <TouchableOpacity
+                  style={[styles.input, styles.dateInput]}
+                  onPress={() => { setPickerType("start"); setShowPicker(true); }}
+                >
+                  <Text style={styles.dateText}>{formatDate(startDate)}</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateSeparator}>~</Text>
+                <TouchableOpacity
+                  style={[styles.input, styles.dateInput]}
+                  onPress={() => { setPickerType("end"); setShowPicker(true); }}
+                >
+                  <Text style={styles.dateText}>{formatDate(endDate)}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {showPicker && (
+                Platform.OS === "ios" ? (
+                  <View style={{ marginBottom: 15, backgroundColor: "#F8FAFC", borderRadius: 12 }}>
+                    <DateTimePicker
+                      value={pickerType === "start" ? startDate : endDate}
+                      mode="date"
+                      display="spinner"
+                      onChange={onChangeDate}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPicker(false)}
+                      style={{ padding: 10, alignItems: "center", backgroundColor: "#EEF2FF", borderRadius: 8, margin: 10 }}
+                    >
+                      <Text style={{ color: "#4F46E5", fontWeight: "700" }}>완료</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <DateTimePicker
+                    value={pickerType === "start" ? startDate : endDate}
+                    mode="date"
+                    display="default"
+                    onChange={onChangeDate}
+                  />
+                )
+              )}
+
+              <Text style={styles.label}>비고 (메모)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={formNote}
+                onChangeText={setFormNote}
+                placeholder="추가 메모를 입력하세요."
+                placeholderTextColor="#9CA3AF"
+                multiline={true}
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </ScrollView>
+
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+              <Text style={styles.saveButtonText}>저장</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -120,7 +363,7 @@ const styles = StyleSheet.create({
   projTitle: { fontSize: 16, fontWeight: "700", color: "#1E293B", marginBottom: 6 },
   projDates: { fontSize: 12, color: "#64748B" },
 
-  scrollInner: { paddingBottom: 100, paddingHorizontal: 20 },
+  scrollInner: { paddingBottom: 120, paddingHorizontal: 20 },
   detailCard: {
     backgroundColor: "#FFF",
     padding: 20,
@@ -158,6 +401,24 @@ const styles = StyleSheet.create({
     color: "#475569",
     marginBottom: 8,
   },
+  detailSubTextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  inlineBadge: {
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 10,
+  },
+  inlineBadgeText: {
+    color: "#4F46E5",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   noteBox: {
     marginTop: 10,
     backgroundColor: "#F8FAFC",
@@ -171,8 +432,43 @@ const styles = StyleSheet.create({
     color: "#475569",
     lineHeight: 18,
   },
-  sectionHeader: { marginBottom: 15 },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: "#1E293B" },
+  timelineWrapper: {
+    marginTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    paddingTop: 15,
+  },
+  sectionHeader: { marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#1E293B" },
+  dDayBadge: {
+    backgroundColor: "#EF4444",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  dDayText: {
+    color: "#FFF",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    marginRight: 8,
+  },
+  filterTabActive: {
+    backgroundColor: "#4F46E5",
+  },
+  filterTabText: {
+    color: "#64748B",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  filterTabTextActive: {
+    color: "#FFF",
+  },
   emptyWrap: {
     marginTop: 40,
     alignItems: "center",
@@ -181,4 +477,73 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     fontSize: 15,
   },
+  editBtn: {
+    padding: 8,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: "#1E293B" },
+  label: { fontSize: 14, fontWeight: "600", color: "#475569", marginBottom: 8, marginTop: 10 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: "#1E293B",
+    backgroundColor: "#F8FAFC",
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateInput: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dateText: {
+    fontSize: 15,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+  dateSeparator: {
+    marginHorizontal: 10,
+    fontSize: 18,
+    color: "#64748B",
+    fontWeight: "700",
+  },
+  textArea: {
+    height: 100, // min-height for multiline
+  },
+  saveButton: {
+    backgroundColor: "#4F46E5",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  saveButtonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

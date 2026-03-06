@@ -14,7 +14,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
 
 export const DashboardScreen = (props) => {
-  const { projects = [], schedule } = props;
+  const { projects = [], schedule, setActiveTab, setExpandedProjId } = props;
   const project = projects[0] || { risks: 0, pendingQuestions: 0 };
   const [modalVisible, setModalVisible] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -93,7 +93,7 @@ export const DashboardScreen = (props) => {
         contentContainerStyle={styles.container}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.sectionTitle}>대시보드</Text>
+          <Text style={styles.sectionTitle}>프로젝트 관리</Text>
           <TouchableOpacity
             style={styles.addProjectBtn}
             onPress={() => setModalVisible(true)}
@@ -115,11 +115,42 @@ export const DashboardScreen = (props) => {
           </View>
         </View>
 
-        {/* 요약 타임라인 섹션 */}
+        {/* 프로젝트 목록 섹션 */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>참여 중인 프로젝트</Text>
+        </View>
+        <View style={styles.projectListContainer}>
+          {projects.map((proj) => (
+            <TouchableOpacity
+              key={proj.id}
+              style={styles.projectListCard}
+              activeOpacity={0.8}
+              onPress={() => {
+                setExpandedProjId(proj.id);
+                setActiveTab("Schedule");
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.projectListTitle} numberOfLines={1}>
+                  {proj.title}
+                </Text>
+                <Text style={styles.projectListDates}>
+                  {proj.startDate} ~ {proj.endDate}
+                </Text>
+              </View>
+              <View style={styles.projectDaysBadge}>
+                <Text style={styles.projectDaysText}>{proj.totalDays}일</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 추후 활용할 것이니 삭제 금지
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>오늘의 촬영 타임라인</Text>
         </View>
         <ScheduleBoard schedule={schedule} />
+        */}
       </ScrollView>
 
       {/* 프로젝트 추가 모달 */}
@@ -227,7 +258,7 @@ export const DashboardScreen = (props) => {
 };
 
 const styles = StyleSheet.create({
-  container: { paddingBottom: 30 },
+  container: { paddingBottom: 120 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -262,6 +293,44 @@ const styles = StyleSheet.create({
   alertLabelBlue: { color: "#1D4ED8", fontWeight: "700", fontSize: 15 },
   sectionHeader: { paddingHorizontal: 20, marginTop: 15, marginBottom: 15 },
   sectionTitle: { fontSize: 19, fontWeight: "800", color: "#1E293B" },
+
+  // Project List Styles
+  projectListContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 5,
+  },
+  projectListCard: {
+    backgroundColor: "#FFF",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  projectListTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 6,
+  },
+  projectListDates: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+  projectDaysBadge: {
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  projectDaysText: {
+    color: "#4F46E5",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 
   // Modal Styles
   modalOverlay: {

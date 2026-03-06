@@ -12,7 +12,7 @@ import {
 import { MapPin, Edit2, Plus, X, Check } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-export const LocationManager = ({ locations, setLocations }) => {
+export const LocationManager = ({ locations, setLocations, schedule, setSchedule }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingLoc, setEditingLoc] = useState(null);
 
@@ -82,6 +82,22 @@ export const LocationManager = ({ locations, setLocations }) => {
             : item
         )
       );
+
+      // 장소 확정 시 일정에 추가 (이미 있지 않은 경우)
+      if (formStatus === "확정") {
+        const exists = schedule.find(s => s.locationId === editingLoc.id || s.location === formName);
+        if (!exists) {
+          setSchedule([...schedule, {
+            id: Date.now(),
+            locationId: editingLoc.id,
+            time: "미정",
+            location: formName,
+            status: "확정",
+            type: "촬영",
+            date: formDate // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+          }]);
+        }
+      }
     } else {
       const newLoc = {
         id: Date.now(),
@@ -91,6 +107,19 @@ export const LocationManager = ({ locations, setLocations }) => {
         status: formStatus,
       };
       setLocations([...locations, newLoc]);
+
+      // 장소 확정 시 일정에 자동 추가
+      if (formStatus === "확정") {
+        setSchedule([...schedule, {
+          id: Date.now(),
+          locationId: newLoc.id,
+          time: "미정",
+          location: formName,
+          status: "확정",
+          type: "촬영",
+          date: formDate // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+        }]);
+      }
     }
     setModalVisible(false);
   };
@@ -323,7 +352,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
   locCardHorizontal: {
     flexDirection: "row",

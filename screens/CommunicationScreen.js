@@ -14,5 +14,5 @@ export const CommunicationScreen = ({ questions }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, marginTop: 10 },
-  inner: { paddingBottom: 100 },
+  inner: { paddingBottom: 120 },
 });

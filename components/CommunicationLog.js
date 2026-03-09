@@ -11,7 +11,7 @@ const STATUS_MAP = {
   resolved: { label: "해결완료", bg: "#F0FDF4", text: "#16A34A" },
 };
 
-export const CommunicationLog = ({ requests, currentUserId, type, onRefresh }) => {
+export const CommunicationLog = ({ requests, currentUserId, type, onRefresh, project }) => {
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   return (
@@ -61,6 +61,7 @@ export const CommunicationLog = ({ requests, currentUserId, type, onRefresh }) =
         request={selectedRequest}
         type={type}
         onRefresh={onRefresh}
+        project={project}
       />
     </View>
   );

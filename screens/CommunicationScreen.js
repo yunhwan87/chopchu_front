@@ -62,6 +62,7 @@ export const CommunicationScreen = ({ project }) => { // project 객체를 prop�
               currentUserId={user?.id}
               type={activeTab}
               onRefresh={fetchCurrentData}
+              project={project}
             />
           )}
         </View>

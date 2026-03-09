@@ -8,7 +8,8 @@ export const LoginForm = ({ onLogin }) => {
     const handleLogin = () => {
         // 실제 서비스에서는 여기에 인증 로직이 들어갑니다.
         // 현재는 이메일이나 비밀번호 검증 없이 무조건 로그인 되도록 구현합니다.
-        onLogin();
+        const nickname = email.includes("@") ? email.split("@")[0] : email;
+        onLogin((nickname || "김제작").trim());
     };
 
     return (

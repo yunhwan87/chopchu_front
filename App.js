@@ -76,7 +76,7 @@ const MOCK_DATA = {
   ],
 };
 
-function MainContent() {
+function MainContent({ currentUserName }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
@@ -96,7 +96,13 @@ function MainContent() {
       case "Schedule":
         return <ScheduleScreen projects={projects} schedule={MOCK_DATA.schedule} />;
       case "Location":
-        return <LocationScreen locations={locations} setLocations={setLocations} />;
+        return (
+          <LocationScreen
+            locations={locations}
+            setLocations={setLocations}
+            currentUserName={currentUserName}
+          />
+        );
       case "Communication":
         return <CommunicationScreen questions={MOCK_DATA.questions} />;
       default:
@@ -123,7 +129,7 @@ function MainContent() {
           </Text>
         </View>
         <TouchableOpacity style={styles.profileCircle}>
-          <Text style={styles.profileText}>김제작</Text>
+          <Text style={styles.profileText}>{`(${currentUserName || "김제작"})`}</Text>
         </TouchableOpacity>
       </View>
 
@@ -176,13 +182,19 @@ const TabItem = ({ icon, label, active, onPress }) => (
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState("김제작");
 
   return (
     <SafeAreaProvider>
       {isLoggedIn ? (
-        <MainContent />
+        <MainContent currentUserName={currentUserName} />
       ) : (
-        <AuthScreen onLogin={() => setIsLoggedIn(true)} />
+        <AuthScreen
+          onLogin={(userName) => {
+            setCurrentUserName(userName || "김제작");
+            setIsLoggedIn(true);
+          }}
+        />
       )}
     </SafeAreaProvider>
   );
@@ -213,12 +225,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   profileCircle: {
-    width: 45,
+    minWidth: 45,
     height: 45,
     borderRadius: 22.5,
     backgroundColor: "#E2E8F0",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 10,
   },
   profileText: { fontSize: 12, fontWeight: "700", color: "#64748B" },
   bottomTab: {

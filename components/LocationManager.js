@@ -114,7 +114,6 @@ export const LocationManager = ({
   schedule,
   setSchedule,
 }) => {
-
   const [modalVisible, setModalVisible] = useState(false);
   const [editingLoc, setEditingLoc] = useState(null);
 
@@ -374,21 +373,26 @@ export const LocationManager = ({
 
       // 장소 확정 시 일정에 추가 (이미 있지 않은 경우)
       if (formStatus === "확정") {
-        const exists = schedule.find(s => s.locationId === editingLoc.id || s.location === formName);
+        const exists = schedule.find(
+          (s) => s.locationId === editingLoc.id || s.location === formName,
+        );
         if (!exists) {
-          setSchedule([...schedule, {
-            id: Date.now(),
-            locationId: editingLoc.id,
-            time: "미정",
-            location: formName,
-            status: "확정",
-            type: "촬영",
-            date: formDate // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
-          }]);
+          setSchedule([
+            ...schedule,
+            {
+              id: Date.now(),
+              locationId: editingLoc.id,
+              time: "미정",
+              location: formName,
+              status: "확정",
+              type: "촬영",
+              date: formDate, // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+            },
+          ]);
         }
       }
     } else {
-      const payload = {
+      const newLoc = {
         id: Date.now(),
         date: formDate,
         name: formName.trim(),
@@ -398,19 +402,22 @@ export const LocationManager = ({
         status: "요청중",
       };
 
-      setLocations([payload,...locations, newLoc]);
+      setLocations([newLoc, ...locations]);
 
       // 장소 확정 시 일정에 자동 추가
       if (formStatus === "확정") {
-        setSchedule([...schedule, {
-          id: Date.now(),
-          locationId: newLoc.id,
-          time: "미정",
-          location: formName,
-          status: "확정",
-          type: "촬영",
-          date: formDate // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
-        }]);
+        setSchedule([
+          ...schedule,
+          {
+            id: Date.now(),
+            locationId: newLoc.id,
+            time: "미정",
+            location: formName,
+            status: "확정",
+            type: "촬영",
+            date: formDate, // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+          },
+        ]);
       }
     }
     setModalVisible(false);
@@ -418,7 +425,10 @@ export const LocationManager = ({
 
   const addRequest = () => {
     if (newRequest.trim()) {
-      setFormRequests([...formRequests, { id: Date.now(), text: newRequest, checked: false }]);
+      setFormRequests([
+        ...formRequests,
+        { id: Date.now(), text: newRequest, checked: false },
+      ]);
       setNewRequest("");
     }
 

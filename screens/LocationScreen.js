@@ -83,6 +83,7 @@ export const LocationScreen = ({ project, locations2, setLocations, schedule, se
     </TouchableOpacity>
   );
 
+export const LocationScreen = ({ locations, setLocations, currentUserName }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -129,7 +130,13 @@ export const LocationScreen = ({ project, locations2, setLocations, schedule, se
           }}
         />
       </Modal>
-      <LocationManager locations={locations2} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />
+     
+      <LocationManager locations={locations2}
+        setLocations={setLocations}
+        schedule={schedule}
+        setSchedule={setSchedule}
+        currentUserName={currentUserName}
+        />
     </View>
   );
 };

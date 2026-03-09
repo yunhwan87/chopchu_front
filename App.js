@@ -180,9 +180,10 @@ const MOCK_DATA = {
   ],
 };
 
+
 import { useAuth } from "./src/hooks/useAuth";
 import { TempProjectSelectorScreen } from "./screens/TempProjectSelectorScreen";
-function MainContent({ onLogout, currentProject, onBackToProjects }) {
+function MainContent({ onLogout, currentProject, onBackToProjects, currentUserName }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
@@ -219,7 +220,9 @@ function MainContent({ onLogout, currentProject, onBackToProjects }) {
           />
         );
       case "Location":
-        return <LocationScreen project={currentProject} locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />;
+
+
+        return <LocationScreen project={currentProject} locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule}  currentUserName={currentUserName} />;
       case "Communication":
         return <CommunicationScreen questions={MOCK_DATA.questions} />;
       default:
@@ -251,7 +254,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects }) {
           </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.profileCircle} onPress={() => setMenuVisible(true)}>
-          <Text style={styles.profileText}>김제작</Text>
+           <Text style={styles.profileText}>{`(${currentUserName || "김제작"})`}</Text>
         </TouchableOpacity>
       </View>
 
@@ -320,8 +323,11 @@ const TabItem = ({ icon, label, active, onPress }) => (
 );
 
 export default function App() {
+
   const { user, loading } = useAuth();
   const [currentProject, setCurrentProject] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState("김제작");
 
   if (loading) {
     return (
@@ -333,13 +339,19 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+
       {!user ? (
-        <AuthScreen />
+        <AuthScreen
+          onLogin={(userName) => {
+            setCurrentUserName(userName || "김제작");
+          }}
+        />
       ) : !currentProject ? (
         <TempProjectSelectorScreen onSelectProject={setCurrentProject} />
       ) : (
         <MainContent
           currentProject={currentProject}
+          currentUserName={currentUserName}
           onBackToProjects={() => setCurrentProject(null)}
         />
       )}
@@ -372,12 +384,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   profileCircle: {
-    width: 45,
+    minWidth: 45,
     height: 45,
     borderRadius: 22.5,
     backgroundColor: "#E2E8F0",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 10,
   },
   profileText: { fontSize: 12, fontWeight: "700", color: "#64748B" },
   bottomTab: {

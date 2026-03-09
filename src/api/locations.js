@@ -6,7 +6,10 @@ import { supabase } from '../lib/supabase';
 export const getLocations = async (projectId) => {
     const { data, error } = await supabase
         .from('locations')
-        .select('*')
+        .select(`
+      *,
+      locations_poc (*)
+    `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
@@ -67,8 +70,8 @@ export const createLocation = async (locationData, pucs = []) => {
 /**
  * 장소 정보 업데이트
  */
-export const updateLocation = async (locationId, updateData) => {
-    const { data, error } = await supabase
+export const updateLocation = async (locationId, updateData, pocs) => {
+    const { data: updatedLocation, error } = await supabase
         .from('locations')
         .update(updateData)
         .eq('id', locationId)
@@ -76,7 +79,40 @@ export const updateLocation = async (locationId, updateData) => {
         .single();
 
     if (error) throw error;
-    return data;
+
+    if (Array.isArray(pocs)) {
+        const { error: deleteError } = await supabase
+            .from('locations_poc')
+            .delete()
+            .eq('location_id', locationId);
+
+        if (deleteError) throw deleteError;
+
+        if (pocs.length > 0) {
+            const pocData = pocs.map((p) => ({
+                ...p,
+                location_id: locationId,
+            }));
+
+            const { error: insertError } = await supabase
+                .from('locations_poc')
+                .insert(pocData);
+
+            if (insertError) throw insertError;
+        }
+    }
+
+    const { data: detail, error: detailError } = await supabase
+        .from('locations')
+        .select(`
+      *,
+      locations_poc (*)
+    `)
+        .eq('id', locationId)
+        .single();
+
+    if (detailError) throw detailError;
+    return detail || updatedLocation;
 };
 
 /**

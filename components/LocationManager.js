@@ -9,8 +9,9 @@ import {
   TextInput,
   Platform,
   Switch,
+  Alert,
 } from "react-native";
-import { MapPin, Plus, X } from "lucide-react-native";
+import { MapPin, Plus, X, Send, User } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const WAITING_STATUSES = [
@@ -25,13 +26,13 @@ const WAITING_STATUS_ALIASES = {
   "제작진답변 대기중": "제작진 답변 대기중",
   "섭외지답변 대기중": "섭외지 답변 대기중",
 };
-const STATUS_OPTIONS = ["요청중", "확정", ...WAITING_STATUSES, "보류", "취소"];
+const STATUS_OPTIONS = ["확정", ...WAITING_STATUSES, "보류", "취소"];
 const FILTER_TABS = ["전체", "요청중", "확정", "보류/취소"];
 const CONFLICT_STATUSES = new Set(["요청중", "확정", ...WAITING_STATUSES]);
 
 const normalizeStatus = (status) => {
-  if (!status) return "요청중";
-  if (status === "섭외 중") return "요청중";
+  if (!status) return "섭외지 답변 대기중";
+  if (status === "섭외 중") return "섭외지 답변 대기중";
   if (WAITING_STATUS_ALIASES[status]) return WAITING_STATUS_ALIASES[status];
   return status;
 };
@@ -43,6 +44,33 @@ const toMinutes = (value) => {
   const [h, m] = value.split(":").map(Number);
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
   return h * 60 + m;
+};
+
+const formatTimeInput = (raw) => {
+  const digits = String(raw || "").replace(/\D/g, "").slice(0, 4);
+  if (!digits) return "";
+
+  if (digits.length <= 2) {
+    const hour = Number(digits);
+    if (!Number.isFinite(hour)) return "";
+    return `${String(Math.max(0, Math.min(23, hour))).padStart(2, "0")}:00`;
+  }
+
+  const hourPart = digits.slice(0, digits.length - 2);
+  const minutePart = digits.slice(-2);
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return "";
+
+  const clampedHour = Math.max(0, Math.min(23, hour));
+  const clampedMinute = Math.max(0, Math.min(59, minute));
+  return `${String(clampedHour).padStart(2, "0")}:${String(clampedMinute).padStart(2, "0")}`;
+};
+
+const normalizeTimeValue = (value) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return formatTimeInput(trimmed);
 };
 
 const isValidTimeRange = (startTime, endTime) => {
@@ -113,8 +141,13 @@ export const LocationManager = ({
   currentUserName = "",
   schedule,
   setSchedule,
+  onCreateLocation,
+  onUpdateLocation,
+  onDeleteLocation,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [selectedLoc, setSelectedLoc] = useState(null);
   const [editingLoc, setEditingLoc] = useState(null);
 
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -133,7 +166,7 @@ export const LocationManager = ({
   const [formRisk, setFormRisk] = useState("");
   const [formMemo, setFormMemo] = useState("");
   const [formRequests, setFormRequests] = useState([]);
-  const [formStatus, setFormStatus] = useState("요청중");
+  const [formStatus, setFormStatus] = useState("섭외지 답변 대기중");
 
   const [newRequest, setNewRequest] = useState("");
   const [newRequestAuthor, setNewRequestAuthor] = useState(currentUserName);
@@ -142,6 +175,7 @@ export const LocationManager = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(new Date());
   const [timeError, setTimeError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = Boolean(editingLoc);
 
@@ -210,7 +244,7 @@ export const LocationManager = ({
     setFormRisk("");
     setFormMemo("");
     setFormRequests([]);
-    setFormStatus("요청중");
+    setFormStatus("섭외지 답변 대기중");
     setNewRequest("");
     setNewRequestAuthor(currentUserName);
     setReplyDrafts({});
@@ -256,6 +290,66 @@ export const LocationManager = ({
     }
     setShowDatePicker(false);
     setModalVisible(true);
+  };
+
+  const openDetailModal = (loc) => {
+    setSelectedLoc(loc);
+    setDetailVisible(true);
+  };
+
+  const closeDetailModal = () => {
+    setDetailVisible(false);
+    setSelectedLoc(null);
+  };
+
+  const openEditFromDetail = () => {
+    if (!selectedLoc) return;
+    setDetailVisible(false);
+    openEditModal(selectedLoc);
+  };
+
+  const handleDeleteFromDetail = () => {
+    if (!selectedLoc) return;
+
+    Alert.alert(
+      "장소 삭제",
+      `'${selectedLoc.name || "선택한 장소"}'를 삭제할까요?`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsSaving(true);
+              if (onDeleteLocation) {
+                await onDeleteLocation(selectedLoc.id);
+              } else {
+                setLocations(
+                  locations.filter((item) => item.id !== selectedLoc.id),
+                );
+              }
+
+              setSchedule(
+                schedule.filter(
+                  (item) =>
+                    item.locationId !== selectedLoc.id &&
+                    item.location !== selectedLoc.name,
+                ),
+              );
+              closeDetailModal();
+            } catch (error) {
+              Alert.alert(
+                "삭제 실패",
+                error?.message || "장소 삭제에 실패했습니다.",
+              );
+            } finally {
+              setIsSaving(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const onChangeDate = (event, selectedDate) => {
@@ -332,13 +426,15 @@ export const LocationManager = ({
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formName.trim()) return;
 
-    const hasAnyTime = Boolean(formStartTime.trim() || formEndTime.trim());
+    const normalizedStartTime = normalizeTimeValue(formStartTime);
+    const normalizedEndTime = normalizeTimeValue(formEndTime);
+    const hasAnyTime = Boolean(normalizedStartTime || normalizedEndTime);
     if (
       hasAnyTime &&
-      !isValidTimeRange(formStartTime.trim(), formEndTime.trim())
+      !isValidTimeRange(normalizedStartTime, normalizedEndTime)
     ) {
       setTimeError("시간 범위를 확인해주세요. (예: 09:00 ~ 11:00)");
       return;
@@ -355,8 +451,8 @@ export const LocationManager = ({
         date: formDate,
         name: formName.trim(),
         manager: formManager.trim(),
-        startTime: formStartTime.trim(),
-        endTime: formEndTime.trim(),
+        startTime: normalizedStartTime,
+        endTime: normalizedEndTime,
         cost: costValue,
         depositPaid: formDepositPaid,
         risk: formRisk.trim(),
@@ -365,23 +461,76 @@ export const LocationManager = ({
         status: formStatus,
       };
 
-      setLocations(
-        locations.map((item) =>
-          item.id === editingLoc.id ? { ...item, ...payload } : item,
-        ),
-      );
+      try {
+        setIsSaving(true);
 
-      // 장소 확정 시 일정에 추가 (이미 있지 않은 경우)
-      if (formStatus === "확정") {
-        const exists = schedule.find(
-          (s) => s.locationId === editingLoc.id || s.location === formName,
-        );
-        if (!exists) {
+        if (onUpdateLocation) {
+          await onUpdateLocation(editingLoc.id, {
+            ...editingLoc,
+            ...payload,
+          });
+        } else {
+          setLocations(
+            locations.map((item) =>
+              item.id === editingLoc.id ? { ...item, ...payload } : item,
+            ),
+          );
+        }
+
+        // 장소 확정 시 일정에 추가 (이미 있지 않은 경우)
+        if (formStatus === "확정") {
+          const exists = schedule.find(
+            (s) => s.locationId === editingLoc.id || s.location === formName,
+          );
+          if (!exists) {
+            setSchedule([
+              ...schedule,
+              {
+                id: Date.now(),
+                locationId: editingLoc.id,
+                time: "미정",
+                location: formName,
+                status: "확정",
+                type: "촬영",
+                date: formDate, // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+              },
+            ]);
+          }
+        }
+        setModalVisible(false);
+      } catch (error) {
+        Alert.alert("저장 실패", error?.message || "장소 수정에 실패했습니다.");
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      const newLoc = {
+        id: Date.now(),
+        date: formDate,
+        name: formName.trim(),
+        startTime: normalizedStartTime,
+        endTime: normalizedEndTime,
+        requests: normalizedRequests,
+        status: "섭외지 답변 대기중",
+      };
+
+      try {
+        setIsSaving(true);
+        const createdLoc = onCreateLocation
+          ? await onCreateLocation(newLoc)
+          : newLoc;
+
+        if (!onCreateLocation) {
+          setLocations([createdLoc, ...locations]);
+        }
+
+        // 장소 확정 시 일정에 자동 추가
+        if (formStatus === "확정") {
           setSchedule([
             ...schedule,
             {
               id: Date.now(),
-              locationId: editingLoc.id,
+              locationId: createdLoc.id,
               time: "미정",
               location: formName,
               status: "확정",
@@ -390,37 +539,13 @@ export const LocationManager = ({
             },
           ]);
         }
-      }
-    } else {
-      const newLoc = {
-        id: Date.now(),
-        date: formDate,
-        name: formName.trim(),
-        startTime: formStartTime.trim(),
-        endTime: formEndTime.trim(),
-        requests: normalizedRequests,
-        status: "요청중",
-      };
-
-      setLocations([newLoc, ...locations]);
-
-      // 장소 확정 시 일정에 자동 추가
-      if (formStatus === "확정") {
-        setSchedule([
-          ...schedule,
-          {
-            id: Date.now(),
-            locationId: newLoc.id,
-            time: "미정",
-            location: formName,
-            status: "확정",
-            type: "촬영",
-            date: formDate, // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
-          },
-        ]);
+        setModalVisible(false);
+      } catch (error) {
+        Alert.alert("저장 실패", error?.message || "장소 생성에 실패했습니다.");
+      } finally {
+        setIsSaving(false);
       }
     }
-    setModalVisible(false);
   };
 
   const addRequest = () => {
@@ -567,7 +692,7 @@ export const LocationManager = ({
             <TouchableOpacity
               key={loc.id}
               style={styles.locCardHorizontal}
-              onPress={() => openEditModal(loc)}
+              onPress={() => openDetailModal(loc)}
               activeOpacity={0.85}
             >
               <View style={styles.cardLeft}>
@@ -624,6 +749,115 @@ export const LocationManager = ({
           );
         })}
       </ScrollView>
+
+      <Modal visible={detailVisible} transparent={true} animationType="fade">
+        <View style={styles.detailOverlay}>
+          <View style={styles.detailModalContent}>
+            <View style={styles.detailHeader}>
+              <Text style={styles.modalTitle}>장소 정보</Text>
+              <TouchableOpacity onPress={closeDetailModal}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedLoc ? (
+              (() => {
+                const requestCount = normalizeRequestThreads(
+                  selectedLoc.requests || [],
+                ).length;
+                const dateTimeText = `${selectedLoc.date || "-"}${
+                  selectedLoc.startTime && selectedLoc.endTime
+                    ? ` · ${selectedLoc.startTime}~${selectedLoc.endTime}`
+                    : ""
+                }`;
+                const costText =
+                  selectedLoc.cost !== null && selectedLoc.cost !== undefined
+                    ? `₩ ${Number(selectedLoc.cost || 0).toLocaleString("ko-KR")}${
+                        selectedLoc.depositPaid ? " · 선금 Y" : " · 선금 N"
+                      }`
+                    : "-";
+
+                return (
+                  <View style={styles.detailInfoCard}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>장소명</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {selectedLoc.name || "-"}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>상태</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {normalizeStatus(selectedLoc.status)}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>촬영일시</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {dateTimeText}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>담당자</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {selectedLoc.manager || "-"}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>비용/선금</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {costText}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>요청사항</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {requestCount > 0 ? `${requestCount}건` : "-"}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>리스크</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {selectedLoc.risk || "-"}
+                      </Text>
+                    </View>
+                    <View style={styles.detailDivider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailKey}>메모</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {selectedLoc.memo || "-"}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()
+            ) : null}
+
+            <View style={styles.detailFooterRow}>
+              <TouchableOpacity
+                style={[styles.editButton, styles.detailActionButton]}
+                onPress={openEditFromDetail}
+                disabled={isSaving || !selectedLoc}
+              >
+                <Text style={styles.editButtonText}>수정</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteButton, styles.detailActionButton]}
+                onPress={handleDeleteFromDetail}
+                disabled={isSaving || !selectedLoc}
+              >
+                <Text style={styles.deleteButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={modalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
@@ -691,9 +925,15 @@ export const LocationManager = ({
                   <TextInput
                     style={styles.input}
                     value={formStartTime}
-                    onChangeText={setFormStartTime}
+                    onChangeText={(value) =>
+                      setFormStartTime(String(value || "").replace(/\D/g, "").slice(0, 4))
+                    }
+                    onBlur={() =>
+                      setFormStartTime((prev) => normalizeTimeValue(prev))
+                    }
                     placeholder="09:00"
                     placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -701,9 +941,13 @@ export const LocationManager = ({
                   <TextInput
                     style={styles.input}
                     value={formEndTime}
-                    onChangeText={setFormEndTime}
+                    onChangeText={(value) =>
+                      setFormEndTime(String(value || "").replace(/\D/g, "").slice(0, 4))
+                    }
+                    onBlur={() => setFormEndTime((prev) => normalizeTimeValue(prev))}
                     placeholder="11:00"
                     placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
                   />
                 </View>
               </View>
@@ -754,14 +998,7 @@ export const LocationManager = ({
               <Text style={styles.label}>요청사항</Text>
               <View style={styles.requestComposerRow}>
                 <TextInput
-                  style={[styles.input, styles.requestAuthorInput]}
-                  value={newRequestAuthor}
-                  onChangeText={setNewRequestAuthor}
-                  placeholder="작성자"
-                  placeholderTextColor="#9CA3AF"
-                />
-                <TextInput
-                  style={[styles.input, styles.requestBodyInput]}
+                  style={styles.requestComposerInput}
                   value={newRequest}
                   onChangeText={setNewRequest}
                   placeholder="요청사항 입력..."
@@ -772,14 +1009,17 @@ export const LocationManager = ({
                   style={styles.addRequestBtn}
                   onPress={addRequestThread}
                 >
-                  <Plus size={18} color="#FFF" />
+                  <Send size={16} color="#FFF" />
                 </TouchableOpacity>
               </View>
 
               {formRequests.map((thread) => (
-                <View key={thread.id} style={styles.threadCard}>
+                <View key={thread.id} style={styles.miniThreadCard}>
                   <View style={styles.threadHeader}>
-                    <Text style={styles.threadAuthor}>{thread.author}</Text>
+                    <View style={styles.miniThreadTitleRow}>
+                      <User size={14} color="#64748B" />
+                      <Text style={styles.threadAuthor}>{thread.author}</Text>
+                    </View>
                     <TouchableOpacity
                       onPress={() => removeRequestThread(thread.id)}
                       style={styles.threadDeleteBtn}
@@ -787,32 +1027,70 @@ export const LocationManager = ({
                       <X size={14} color="#9CA3AF" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.threadText}>{thread.text}</Text>
-
-                  {(thread.replies || []).map((reply) => (
-                    <View key={reply.id} style={styles.replyItem}>
-                      <Text style={styles.replyAuthor}>{reply.author}</Text>
-                      <Text style={styles.replyText}>{reply.text}</Text>
-                    </View>
-                  ))}
+                  {[
+                    {
+                      id: `root-${thread.id}`,
+                      author: thread.author,
+                      text: thread.text,
+                      isRoot: true,
+                    },
+                    ...(thread.replies || []).map((reply) => ({
+                      id: reply.id,
+                      author: reply.author,
+                      text: reply.text,
+                      isRoot: false,
+                    })),
+                  ].map((message) => {
+                    const mine =
+                      String(message.author || "").trim() ===
+                        String(currentUserName || "").trim() &&
+                      Boolean(currentUserName);
+                    return (
+                      <View
+                        key={message.id}
+                        style={[
+                          styles.miniMessageRow,
+                          mine
+                            ? styles.miniMessageRowMine
+                            : styles.miniMessageRowOther,
+                        ]}
+                      >
+                        {!mine ? (
+                          <View style={styles.miniAvatar}>
+                            <User size={12} color="#64748B" />
+                          </View>
+                        ) : null}
+                        <View
+                          style={[
+                            styles.miniMessageBubble,
+                            mine
+                              ? styles.miniBubbleMine
+                              : styles.miniBubbleOther,
+                          ]}
+                        >
+                          {!mine ? (
+                            <Text style={styles.miniSenderText}>
+                              {message.author || "댓글"}
+                            </Text>
+                          ) : null}
+                          <Text
+                            style={[
+                              styles.miniMessageText,
+                              mine
+                                ? styles.miniMessageTextMine
+                                : styles.miniMessageTextOther,
+                            ]}
+                          >
+                            {message.text}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
 
                   <View style={styles.replyComposerRow}>
                     <TextInput
-                      style={[styles.input, styles.replyAuthorInput]}
-                      value={
-                        replyAuthorDrafts[thread.id] ?? currentUserName ?? ""
-                      }
-                      onChangeText={(value) =>
-                        setReplyAuthorDrafts((prev) => ({
-                          ...prev,
-                          [thread.id]: value,
-                        }))
-                      }
-                      placeholder="댓글작성자"
-                      placeholderTextColor="#9CA3AF"
-                    />
-                    <TextInput
-                      style={[styles.input, styles.replyBodyInput]}
+                      style={styles.replyComposerInput}
                       value={replyDrafts[thread.id] || ""}
                       onChangeText={(value) =>
                         setReplyDrafts((prev) => ({
@@ -828,7 +1106,7 @@ export const LocationManager = ({
                       style={styles.replySubmitBtn}
                       onPress={() => addReply(thread.id)}
                     >
-                      <Text style={styles.replySubmitText}>등록</Text>
+                      <Send size={15} color="#FFF" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -874,8 +1152,14 @@ export const LocationManager = ({
               ) : null}
             </ScrollView>
 
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>저장</Text>
+            <TouchableOpacity
+              style={[styles.saveButton, isSaving && { opacity: 0.6 }]}
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              <Text style={styles.saveButtonText}>
+                {isSaving ? "저장 중..." : "저장"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1107,11 +1391,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
   },
+  detailOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  detailModalContent: {
+    backgroundColor: "#FFF",
+    borderRadius: 18,
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 24,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 18,
@@ -1177,6 +1488,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
+  requestComposerInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 18,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#1E293B",
+    marginBottom: 0,
+  },
   requestAuthorInput: {
     width: 92,
     minWidth: 92,
@@ -1190,9 +1513,74 @@ const styles = StyleSheet.create({
     backgroundColor: "#4F46E5",
     width: 42,
     height: 42,
-    borderRadius: 10,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
+  },
+  miniThreadCard: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+  },
+  miniThreadTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  miniMessageRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+    alignItems: "flex-end",
+  },
+  miniMessageRowMine: {
+    justifyContent: "flex-end",
+  },
+  miniMessageRowOther: {
+    justifyContent: "flex-start",
+  },
+  miniAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 6,
+  },
+  miniMessageBubble: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    maxWidth: "82%",
+  },
+  miniBubbleMine: {
+    backgroundColor: "#4F46E5",
+    borderBottomRightRadius: 4,
+  },
+  miniBubbleOther: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderBottomLeftRadius: 4,
+  },
+  miniSenderText: {
+    fontSize: 10,
+    color: "#94A3B8",
+    marginBottom: 2,
+    fontWeight: "700",
+  },
+  miniMessageText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  miniMessageTextMine: {
+    color: "#FFF",
+  },
+  miniMessageTextOther: {
+    color: "#1E293B",
   },
   threadCard: {
     backgroundColor: "#F8FAFC",
@@ -1245,7 +1633,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 4,
+    marginTop: 2,
+  },
+  replyComposerInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    backgroundColor: "#FFF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    marginBottom: 0,
+    color: "#1E293B",
   },
   replyAuthorInput: {
     width: 92,
@@ -1264,14 +1664,62 @@ const styles = StyleSheet.create({
   },
   replySubmitBtn: {
     backgroundColor: "#4F46E5",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
   },
   replySubmitText: {
     color: "#FFF",
     fontSize: 12,
     fontWeight: "700",
+  },
+  detailInfoCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  detailRow: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  detailKey: {
+    width: 72,
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  detailValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "600",
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+  },
+  readonlyBox: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginBottom: 10,
+  },
+  readonlyText: {
+    color: "#1E293B",
+    fontSize: 14,
+    lineHeight: 20,
   },
   textArea: {
     minHeight: 90,
@@ -1315,6 +1763,43 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: "#FFF",
     fontSize: 16,
+    fontWeight: "700",
+  },
+  detailFooterRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 0,
+    paddingBottom: 4,
+  },
+  detailActionButton: {
+    flex: 1,
+    marginTop: 0,
+  },
+  editButton: {
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  editButtonText: {
+    color: "#3730A3",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  deleteButton: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  deleteButtonText: {
+    color: "#B91C1C",
+    fontSize: 15,
     fontWeight: "700",
   },
 });

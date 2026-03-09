@@ -38,11 +38,11 @@ export const useLocations = (projectId) => {
         }
     };
 
-    const updateLocation = async (locationId, updateData) => {
+    const updateLocation = async (locationId, updateData, pocs) => {
         setLoading(true);
         setError(null);
         try {
-            const updated = await locationApi.updateLocation(locationId, updateData);
+            const updated = await locationApi.updateLocation(locationId, updateData, pocs);
             setLocations(prev => prev.map(l => l.id === locationId ? updated : l));
             return { success: true, data: updated };
         } catch (err) {

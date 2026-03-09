@@ -388,7 +388,7 @@ export const LocationManager = ({
         }
       }
     } else {
-      const payload = {
+      const newLoc = {
         id: Date.now(),
         date: formDate,
         name: formName.trim(),
@@ -398,7 +398,7 @@ export const LocationManager = ({
         status: "요청중",
       };
 
-      setLocations([payload,...locations, newLoc]);
+      setLocations([newLoc, ...locations]);
 
       // 장소 확정 시 일정에 자동 추가
       if (formStatus === "확정") {

@@ -11,8 +11,22 @@ const STATUS_MAP = {
   resolved: { label: "해결완료", bg: "#F0FDF4", text: "#16A34A" },
 };
 
-export const CommunicationLog = ({ requests, currentUserId, type, onRefresh }) => {
+export const CommunicationLog = ({ requests, currentUserId, type, onRefresh, isDashboard }) => {
   const [selectedRequest, setSelectedRequest] = useState(null);
+
+  const getDDay = (createdAt) => {
+    const created = new Date(createdAt);
+    created.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = today - created;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    return `D+${diffDays}`;
+  };
+
 
   return (
     <View style={styles.container}>
@@ -30,27 +44,44 @@ export const CommunicationLog = ({ requests, currentUserId, type, onRefresh }) =
                 <Text style={styles.userName}>
                   {targetLabel}: {otherUser?.nickname || otherUser?.email || "알 수 없음"}
                 </Text>
+                {isDashboard && (
+                  <Text style={styles.dashboardDateInline}>
+                    | {new Date(q.created_at).toLocaleDateString()}
+                  </Text>
+                )}
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                <Text style={[styles.statusText, { color: statusInfo.text }]}>
-                  {statusInfo.label}
-                </Text>
+              <View style={styles.headerRight}>
+                <View style={[styles.dDayBadge, { backgroundColor: q.status === 'resolved' ? '#F1F5F9' : '#FEE2E2' }]}>
+                  <Text style={[styles.dDayText, { color: q.status === 'resolved' ? '#64748B' : '#EF4444' }]}>
+                    {getDDay(q.created_at)}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+                  <Text style={[styles.statusText, { color: statusInfo.text }]}>
+                    {statusInfo.label}
+                  </Text>
+                </View>
               </View>
             </View>
+
+
+
 
             <Text style={styles.questionText} numberOfLines={2}>
               {q.title}
             </Text>
 
-            <View style={styles.footerRow}>
-              <Text style={styles.dateText}>
-                {new Date(q.created_at).toLocaleDateString()}
-              </Text>
-              <View style={styles.detailBtn}>
-                <Text style={styles.detailText}>상세보기</Text>
-                <ChevronRight size={14} color="#94A3B8" />
+            {!isDashboard && (
+              <View style={styles.footerRow}>
+                <Text style={styles.dateText}>
+                  {new Date(q.created_at).toLocaleDateString()}
+                </Text>
+                <View style={styles.detailBtn}>
+                  <Text style={styles.detailText}>상세보기</Text>
+                  <ChevronRight size={14} color="#94A3B8" />
+                </View>
               </View>
-            </View>
+            )}
           </TouchableOpacity>
         );
       })}
@@ -86,6 +117,18 @@ const styles = StyleSheet.create({
   userName: { fontSize: 12, color: "#64748B", fontWeight: "600" },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   statusText: { fontSize: 11, fontWeight: "800" },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dDayBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  dDayText: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
   questionText: {
     fontSize: 15,
     color: "#1E293B",
@@ -99,6 +142,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   answerText: { fontSize: 14, color: "#475569", lineHeight: 20 },
+  dashboardDateInline: {
+    fontSize: 11,
+    color: "#94A3B8",
+    marginLeft: 4,
+  },
   footerRow: {
     flexDirection: "row",
     justifyContent: "space-between",

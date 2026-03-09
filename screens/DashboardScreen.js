@@ -9,13 +9,31 @@ import {
   TextInput,
   Platform,
 } from "react-native";
-import { Plus, X } from "lucide-react-native";
+import { Plus, X, Folder } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
+import { useProjects } from "../src/hooks/useProjects";
+import { useEffect } from "react";
+import { useAuth } from "../src/hooks/useAuth";
+import { useRequests } from "../src/hooks/useRequests";
+import { CommunicationLog } from "../components/CommunicationLog";
 
 export const DashboardScreen = (props) => {
-  const { projects = [], schedule, setActiveTab, setExpandedProjId } = props;
-  const project = projects[0] || { risks: 0, pendingQuestions: 0 };
+  const { projects = [], schedule, setActiveTab, setExpandedProjId, onSelectProject, currentProject } = props;
+  const { user } = useAuth();
+  const { projects: apiProjects, loading: projectsLoading, fetchProjects } = useProjects();
+  const { requests: receivedRequests, loading: requestsLoading, loadRequests } = useRequests();
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    if (currentProject?.id && user?.id) {
+      loadRequests(currentProject.id, user.id, 'received');
+    }
+  }, [currentProject?.id, user?.id, loadRequests]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [membersStr, setMembersStr] = useState("");
@@ -93,7 +111,7 @@ export const DashboardScreen = (props) => {
         contentContainerStyle={styles.container}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.sectionTitle}>프로젝트 관리</Text>
+          <Text style={styles.sectionTitle}>대기중인 요청</Text>
           <TouchableOpacity
             style={styles.addProjectBtn}
             onPress={() => setModalVisible(true)}
@@ -103,19 +121,55 @@ export const DashboardScreen = (props) => {
           </TouchableOpacity>
         </View>
 
-        {/* 위험 및 대기 알림 섹션 */}
-        <View style={styles.alertContainer}>
-          <View style={[styles.alertCard, { backgroundColor: "#FEF2F2" }]}>
-            <Text style={styles.alertLabel}>위험 {project.risks}</Text>
-          </View>
-          <View style={[styles.alertCard, { backgroundColor: "#EFF6FF" }]}>
-            <Text style={styles.alertLabelBlue}>
-              대기 {project.pendingQuestions}
-            </Text>
-          </View>
+        {/* 받은 요청 리스트 섹션 (기존 알림 섹션 대체) */}
+        <View style={styles.requestsWrapper}>
+          <CommunicationLog
+            requests={receivedRequests}
+            currentUserId={user?.id}
+            type="received"
+            onRefresh={() => loadRequests(currentProject.id, user.id, 'received')}
+            isDashboard={true}
+          />
+          {receivedRequests.length === 0 && !requestsLoading && (
+            <View style={styles.emptyRequests}>
+              <Text style={styles.emptyRequestsText}>새로운 요청이 없습니다.</Text>
+            </View>
+          )}
         </View>
 
-        {/* 프로젝트 목록 섹션 */}
+
+        {/* 신규: 내 프로젝트 (Temp) 화면 스타일의 바로가기 섹션 - 세로 리스트형으로 변경 */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>프로젝트 바로가기</Text>
+        </View>
+        <View style={styles.recentProjectsVerticalList}>
+          {apiProjects.map((proj) => (
+            <TouchableOpacity
+              key={proj.id}
+              style={styles.recentProjectCardVertical}
+              onPress={() => onSelectProject && onSelectProject(proj)}
+            >
+              <View style={styles.recentProjectIcon}>
+                <Folder color="#4F46E5" size={20} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.recentProjectTitle} numberOfLines={1}>
+                  {proj.title}
+                </Text>
+                <Text style={styles.recentProjectSubtitle}>
+                  {proj.start_date || proj.startDate} ~ {proj.end_date || proj.endDate}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+          {apiProjects.length === 0 && !projectsLoading && (
+            <Text style={styles.emptyRecentText}>등록된 프로젝트가 없습니다.</Text>
+          )}
+        </View>
+
+
+
+        {/* 프로젝트 목록 섹션 - 주석 처리
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>참여 중인 프로젝트</Text>
         </View>
@@ -144,6 +198,8 @@ export const DashboardScreen = (props) => {
             </TouchableOpacity>
           ))}
         </View>
+        */}
+
 
         {/* 추후 활용할 것이니 삭제 금지
         <View style={styles.sectionHeader}>
@@ -281,16 +337,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 6,
   },
-  alertContainer: { flexDirection: "row", paddingHorizontal: 20, paddingVertical: 10, gap: 12 },
-  alertCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+  requestsWrapper: {
+    paddingTop: 5,
   },
-  alertLabel: { color: "#B91C1C", fontWeight: "700", fontSize: 15 },
-  alertLabelBlue: { color: "#1D4ED8", fontWeight: "700", fontSize: 15 },
+  emptyRequests: {
+    padding: 30,
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    marginHorizontal: 20,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  emptyRequestsText: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
   sectionHeader: { paddingHorizontal: 20, marginTop: 15, marginBottom: 15 },
   sectionTitle: { fontSize: 19, fontWeight: "800", color: "#1E293B" },
 
@@ -402,4 +464,52 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   saveButtonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+
+  // 신규 스타일 - 세로형 리스트로 수정
+  recentProjectsVerticalList: {
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 20,
+  },
+  recentProjectCardVertical: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  recentProjectIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  recentProjectTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  recentProjectSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  emptyRecentText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 10,
+  },
 });
+
+

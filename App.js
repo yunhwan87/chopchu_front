@@ -221,7 +221,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects }) {
       case "Location":
         return <LocationScreen project={currentProject} locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} />;
       case "Communication":
-        return <CommunicationScreen questions={MOCK_DATA.questions} />;
+        return <CommunicationScreen project={currentProject} />;
       default:
         return null;
     }

@@ -29,9 +29,9 @@ export const useAuth = () => {
         return result;
     };
 
-    const register = async (email, password) => {
+    const register = async (email, password, nickname) => {
         setLoading(true);
-        const result = await authService.register(email, password);
+        const result = await authService.register(email, password, nickname);
         setLoading(false);
         return result;
     };
@@ -42,11 +42,17 @@ export const useAuth = () => {
         setLoading(false);
     };
 
+    const checkNickname = async (nickname) => {
+        const result = await authService.checkNickname(nickname);
+        return result;
+    };
+
     return {
         user,
         loading,
         login,
         register,
         logout,
+        checkNickname,
     };
 };

@@ -105,7 +105,11 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh,
                         try {
                             const result = await summarizeRequestToLocation(project.id, request, messages);
                             if (result.success) {
-                                alert(`[AI 요약 완료]\n'${result.locationName}' 섭외지 노트에 자동 요약이 추가되었습니다.\n\n${result.summary}`);
+                                if (result.locationName) {
+                                    alert(`[AI 요약 완료]\n'${result.locationName}' 섭외지에 자동 요약이 추가되었습니다.\n\n${result.summary}`);
+                                } else {
+                                    alert(`[요청 해결]\n${result.summary}`);
+                                }
                             } else {
                                 console.log("AI 요약 생략:", result.reason);
                             }
@@ -137,7 +141,7 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh,
             {aiSummarizing && (
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color="#FFF" />
-                    <Text style={styles.loadingText}>AI가 섭외지 노트에 요약을 추가 중입니다...</Text>
+                    <Text style={styles.loadingText}>AI가 대화 내용을 요약하고 있습니다...</Text>
                 </View>
             )}
             <KeyboardAvoidingView

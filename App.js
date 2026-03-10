@@ -17,6 +17,7 @@ import {
   List,
   Map,
   Bell,
+  MessageCircle,
 } from "lucide-react-native";
 
 // 1. 분리된 스크린 컴포넌트 임포트 (경로 확인 완료)
@@ -25,6 +26,7 @@ import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { LocationScreen } from "./screens/LocationScreen";
 import { CommunicationScreen } from "./screens/CommunicationScreen";
 import { AuthScreen } from "./screens/AuthScreen";
+import { ChatMainScreen } from "./screens/ChatMainScreen";
 
 // 중앙 관리형 데이터 (기존 유지)
 const MOCK_DATA = {
@@ -212,6 +214,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
   const { logout } = useAuth();
   const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [isTabBarVisible, setIsTabBarVisible] = useState(true);
 
   // 메인 탭(ScheduleScreen)에서 열려있을 프로젝트 ID 상태
   const [expandedProjId, setExpandedProjId] = useState(null);
@@ -249,6 +252,8 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
         return <LocationScreen project={currentProject} locations={locations} setLocations={setLocations} schedule={schedule} setSchedule={setSchedule} currentUserName={currentUserName} />;
       case "Communication":
         return <CommunicationScreen project={currentProject} />;
+      case "Chat":
+        return <ChatMainScreen project={currentProject} onSetTabBarVisibility={setIsTabBarVisible} />;
       default:
         return null;
     }
@@ -274,6 +279,9 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             <Text style={styles.profileText}>{currentUserName || "사용자"}</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity style={styles.profileCircle} onPress={() => setMenuVisible(true)}>
+          <Text style={styles.profileText}>{`(${currentUserName || "김제작"})`}</Text>
+        </TouchableOpacity>
       </View>
 
 
@@ -297,37 +305,45 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
       </Modal>
 
       {/* 하단 탭 네비게이션 */}
-      <View
-        style={[
-          styles.bottomTab,
-          { height: 70 + insets.bottom, paddingBottom: insets.bottom },
-        ]}
-      >
-        <TabItem
-          icon={<Home size={24} />}
-          label="홈"
-          active={activeTab === "Dashboard"}
-          onPress={() => setActiveTab("Dashboard")}
-        />
-        <TabItem
-          icon={<List size={24} />}
-          label="메인"
-          active={activeTab === "Schedule"}
-          onPress={() => setActiveTab("Schedule")}
-        />
-        <TabItem
-          icon={<Map size={24} />}
-          label="섭외"
-          active={activeTab === "Location"}
-          onPress={() => setActiveTab("Location")}
-        />
-        <TabItem
-          icon={<Bell size={24} />}
-          label="요청"
-          active={activeTab === "Communication"}
-          onPress={() => setActiveTab("Communication")}
-        />
-      </View>
+      {isTabBarVisible && (
+        <View
+          style={[
+            styles.bottomTab,
+            { height: 70 + insets.bottom, paddingBottom: insets.bottom },
+          ]}
+        >
+          <TabItem
+            icon={<Home size={24} />}
+            label="홈"
+            active={activeTab === "Dashboard"}
+            onPress={() => setActiveTab("Dashboard")}
+          />
+          <TabItem
+            icon={<List size={24} />}
+            label="메인"
+            active={activeTab === "Schedule"}
+            onPress={() => setActiveTab("Schedule")}
+          />
+          <TabItem
+            icon={<Map size={24} />}
+            label="섭외"
+            active={activeTab === "Location"}
+            onPress={() => setActiveTab("Location")}
+          />
+          <TabItem
+            icon={<Bell size={24} />}
+            label="요청"
+            active={activeTab === "Communication"}
+            onPress={() => setActiveTab("Communication")}
+          />
+          <TabItem
+            icon={<MessageCircle size={24} />}
+            label="채팅"
+            active={activeTab === "Chat"}
+            onPress={() => setActiveTab("Chat")}
+          />
+        </View>
+      )}
     </View>
   );
 }

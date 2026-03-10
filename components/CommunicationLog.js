@@ -11,7 +11,9 @@ const STATUS_MAP = {
   resolved: { label: "해결완료", bg: "#F0FDF4", text: "#16A34A" },
 };
 
-export const CommunicationLog = ({ requests, currentUserId, type, onRefresh, isDashboard }) => {
+
+export const CommunicationLog = ({ requests, currentUserId, type, onRefresh, isDashboard, project  }) => {
+
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   const getDDay = (createdAt) => {
@@ -92,6 +94,7 @@ export const CommunicationLog = ({ requests, currentUserId, type, onRefresh, isD
         request={selectedRequest}
         type={type}
         onRefresh={onRefresh}
+        project={project}
       />
     </View>
   );

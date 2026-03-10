@@ -15,6 +15,7 @@ import {
 import { User, X, Send, ChevronDown } from "lucide-react-native";
 import { useAuth } from "../src/hooks/useAuth";
 import { useRequests } from "../src/hooks/useRequests";
+import { summarizeRequestToLocation } from "../src/services/summarizeService";
 
 const STATUS_OPTIONS = [
     { value: "pending", label: "요청 확인 대기 중", bg: "#FFF7ED", text: "#EA580C" },
@@ -23,7 +24,7 @@ const STATUS_OPTIONS = [
     { value: "resolved", label: "해결완료", bg: "#F0FDF4", text: "#16A34A" },
 ];
 
-export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh }) => {
+export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh, project }) => {
     const { user } = useAuth();
     const { getThread, replyToRequest, changeStatus } = useRequests();
 
@@ -32,6 +33,7 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh 
     const [replyText, setReplyText] = useState("");
     const [showStatusMenu, setShowStatusMenu] = useState(false);
     const [currentStatus, setCurrentStatus] = useState(request?.status || "pending");
+    const [aiSummarizing, setAiSummarizing] = useState(false);
 
     useEffect(() => {
         if (visible && request) {
@@ -93,10 +95,32 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh 
     const handleResolveConfirm = () => {
         Alert.alert(
             "요청 해결 확인",
-            "이 요청이 완전히 해결되었나요?\n해결 완료 처리 후에도 필요 시 다시 되돌릴 수 있습니다.",
+            "이 요청이 완전히 해결되었나요?\n해결 완료 처리 후 관련된 섭외지가 있다면 AI가 자동으로 요약을 추가합니다.",
             [
                 { text: "아니요", style: "cancel" },
-                { text: "네, 해결되었습니다", onPress: () => handleStatusChange("resolved") }
+                {
+                    text: "네, 해결되었습니다",
+                    onPress: async () => {
+                        setAiSummarizing(true);
+                        try {
+                            const result = await summarizeRequestToLocation(project.id, request, messages);
+                            if (result.success) {
+                                if (result.locationName) {
+                                    alert(`[AI 요약 완료]\n'${result.locationName}' 섭외지에 자동 요약이 추가되었습니다.\n\n${result.summary}`);
+                                } else {
+                                    alert(`[요청 해결]\n${result.summary}`);
+                                }
+                            } else {
+                                console.log("AI 요약 생략:", result.reason);
+                            }
+                        } catch (error) {
+                            console.error("AI 요약 실패:", error);
+                        } finally {
+                            setAiSummarizing(false);
+                            handleStatusChange("resolved");
+                        }
+                    }
+                }
             ]
         );
     };
@@ -114,6 +138,12 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh 
 
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+            {aiSummarizing && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#FFF" />
+                    <Text style={styles.loadingText}>AI가 대화 내용을 요약하고 있습니다...</Text>
+                </View>
+            )}
             <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -231,6 +261,19 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh 
 };
 
 const styles = StyleSheet.create({
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+    },
+    loadingText: {
+        color: "#FFF",
+        marginTop: 12,
+        fontSize: 15,
+        fontWeight: "600",
+    },
     container: { flex: 1, backgroundColor: "#F8FAFC" },
     header: {
         flexDirection: "row",

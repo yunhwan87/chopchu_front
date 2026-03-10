@@ -78,18 +78,18 @@ export const LocationScreen = ({
         if (!text) return null;
         const replies = Array.isArray(thread?.replies)
           ? thread.replies
-              .map((reply, replyIndex) => {
-                const replyText = String(reply?.text || "").trim();
-                if (!replyText) return null;
-                return {
-                  id:
-                    reply?.id ||
-                    `rp-${Date.now()}-${threadIndex}-${replyIndex}`,
-                  author: String(reply?.author || "댓글"),
-                  text: replyText,
-                };
-              })
-              .filter(Boolean)
+            .map((reply, replyIndex) => {
+              const replyText = String(reply?.text || "").trim();
+              if (!replyText) return null;
+              return {
+                id:
+                  reply?.id ||
+                  `rp-${Date.now()}-${threadIndex}-${replyIndex}`,
+                author: String(reply?.author || "댓글"),
+                text: replyText,
+              };
+            })
+            .filter(Boolean)
           : [];
 
         return {
@@ -199,8 +199,8 @@ export const LocationScreen = ({
       shooting_time,
       cost:
         item.cost === null ||
-        item.cost === undefined ||
-        Number.isNaN(Number(item.cost))
+          item.cost === undefined ||
+          Number.isNaN(Number(item.cost))
           ? 0
           : Number(item.cost),
       deposit_status: Boolean(item.depositPaid),
@@ -343,7 +343,7 @@ export const LocationScreen = ({
       </View>
 
       {loading && uiLocations.length === 0 ? (
-        <ActivityIndicator size="large" color="#4F46E5" style={{ flex: 1 }} />
+        <ActivityIndicator size="large" color="#4F46E5" style={{ marginVertical: 20 }} />
       ) : null}
       {error ? <Text style={styles.errorText}>DB 오류: {error}</Text> : null}
 

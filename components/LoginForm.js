@@ -6,17 +6,49 @@ export const LoginForm = ({ onLogin }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const { login, register, loading } = useAuth();
+    const [nickname, setNickname] = useState("");
+    const [isNicknameChecked, setIsNicknameChecked] = useState(false);
+    const [checkingNickname, setCheckingNickname] = useState(false);
+    const { login, register, checkNickname, loading } = useAuth();
+
+    const handleCheckNickname = async () => {
+        const trimmedNickname = nickname.trim();
+        if (!trimmedNickname) {
+            Alert.alert("알림", "닉네임을 입력해주세요.");
+            return;
+        }
+
+        setCheckingNickname(true);
+        const result = await checkNickname(trimmedNickname);
+        setCheckingNickname(false);
+
+        if (result.success) {
+            if (result.isTaken) {
+                Alert.alert("알림", "이미 사용 중인 닉네임입니다.");
+                setIsNicknameChecked(false);
+            } else {
+                Alert.alert("성공", "사용 가능한 닉네임입니다.");
+                setIsNicknameChecked(true);
+            }
+        } else {
+            Alert.alert("오류", "중복 확인 중 문제가 발생했습니다.");
+        }
+    };
 
     const handleSubmit = async () => {
-        if (!email || !password) {
-            Alert.alert("알림", "이메일과 비밀번호를 입력해주세요.");
+        if (!email || !password || (!isLogin && !nickname)) {
+            Alert.alert("알림", isLogin ? "이메일과 비밀번호를 입력해주세요." : "이메일, 비밀번호, 닉네임을 모두 입력해주세요.");
+            return;
+        }
+
+        if (!isLogin && !isNicknameChecked) {
+            Alert.alert("알림", "이미 사용 중인 닉네임입니다.");
             return;
         }
 
         const result = isLogin
             ? await login(email, password)
-            : await register(email, password);
+            : await register(email, password, nickname);
 
         if (result.success) {
             if (isLogin) {
@@ -47,6 +79,36 @@ export const LoginForm = ({ onLogin }) => {
                 keyboardType="email-address"
                 editable={!loading}
             />
+
+            {!isLogin && (
+                <View style={styles.nicknameContainer}>
+                    <TextInput
+                        style={[styles.input, styles.nicknameInput]}
+                        placeholder="닉네임"
+                        placeholderTextColor="#9CA3AF"
+                        value={nickname}
+                        onChangeText={(text) => {
+                            setNickname(text);
+                            setIsNicknameChecked(false);
+                        }}
+                        autoCapitalize="none"
+                        editable={!loading && !checkingNickname}
+                    />
+                    <TouchableOpacity
+                        style={[styles.checkButton, isNicknameChecked && styles.checkButtonSuccess]}
+                        onPress={handleCheckNickname}
+                        disabled={loading || checkingNickname}
+                    >
+                        {checkingNickname ? (
+                            <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                            <Text style={styles.checkButtonText}>
+                                {isNicknameChecked ? "확인됨" : "중복확인"}
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            )}
             <TextInput
                 style={styles.input}
                 placeholder="비밀번호"
@@ -156,5 +218,32 @@ const styles = StyleSheet.create({
         color: "#4F46E5",
         fontSize: 14,
         fontWeight: "700",
+    },
+    nicknameContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    nicknameInput: {
+        flex: 1,
+        marginBottom: 0,
+        marginRight: 8,
+    },
+    checkButton: {
+        backgroundColor: "#4F46E5",
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        minWidth: 80,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    checkButtonSuccess: {
+        backgroundColor: "#10B981",
+    },
+    checkButtonText: {
+        color: "#FFF",
+        fontSize: 14,
+        fontWeight: "600",
     },
 });

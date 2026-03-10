@@ -10,6 +10,7 @@ import {
   Platform,
   Switch,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Plus, X, Folder } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -19,6 +20,8 @@ import { useEffect } from "react";
 import { useAuth } from "../src/hooks/useAuth";
 import { useRequests } from "../src/hooks/useRequests";
 import { CommunicationLog } from "../components/CommunicationLog";
+import { searchUsers } from "../src/api/profiles";
+import { Search, UserPlus } from "lucide-react-native";
 
 export const DashboardScreen = (props) => {
   const { projects = [], schedule, setActiveTab, setExpandedProjId, onSelectProject, currentProject, addProject, projectsLoading } = props;
@@ -34,10 +37,36 @@ export const DashboardScreen = (props) => {
     }
   }, [user?.id, loadRequests]);
 
+  // 사용자 검색 로직 (0.5초 디바운싱)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (memberQuery.length >= 2) {
+        setSearching(true);
+        try {
+          const results = await searchUsers(memberQuery);
+          // 이미 선택된 멤버는 검색 결과에서 제외
+          setSearchResults(results.filter(r => !selectedMembers.some(sm => sm.id === r.id)));
+        } catch (err) {
+          console.error('Search error:', err);
+        } finally {
+          setSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [memberQuery, selectedMembers]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const [membersStr, setMembersStr] = useState("");
   const [note, setNote] = useState("");
+
+  // 멤버 검색 및 선택 상태
+  const [memberQuery, setMemberQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   // Dates
   const [startDate, setStartDate] = useState(new Date());
@@ -45,7 +74,7 @@ export const DashboardScreen = (props) => {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerType, setPickerType] = useState("start"); // "start" or "end"
 
-  const membersCount = membersStr.split(",").filter((m) => m.trim().length > 0).length;
+  const membersCount = selectedMembers.length;
 
   // Calculate days difference (startDate -> endDate)
   // Ensure we drop time portion for correct day diff
@@ -100,9 +129,7 @@ export const DashboardScreen = (props) => {
         endDate: formatDate(endDate),
         totalDays: totalDays,
         note: note,
-        // membersStr은 현재 DB 스키마에 따라 처리 방식이 다를 수 있으나, 
-        // 우선 note나 다른 필드에 포함하거나 생략 가능합니다.
-        // 현재는 title과 날짜 정보가 핵심입니다.
+        memberIds: selectedMembers.map(m => m.id), // 고유 ID 리스트 전달
       };
 
       const result = await addProject(projectData);
@@ -125,7 +152,8 @@ export const DashboardScreen = (props) => {
 
         setModalVisible(false);
         setProjectName("");
-        setMembersStr("");
+        setSelectedMembers([]);
+        setMemberQuery("");
         setNote("");
         setStartDate(new Date());
         setEndDate(new Date());
@@ -267,17 +295,62 @@ export const DashboardScreen = (props) => {
                 placeholderTextColor="#9CA3AF"
               />
 
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>참여 인원</Text>
-                <Text style={styles.highlightText}>총 {membersCount}명</Text>
+              <Text style={styles.label}>참여 멤버 검색</Text>
+              <View style={styles.searchWrapper}>
+                <Search size={18} color="#94A3B8" />
+                <TextInput
+                  style={styles.searchField}
+                  placeholder="이름 또는 이메일 검색"
+                  placeholderTextColor="#94A3B8"
+                  value={memberQuery}
+                  onChangeText={setMemberQuery}
+                />
+                {searching && <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 8 }} />}
               </View>
-              <TextInput
-                style={styles.input}
-                value={membersStr}
-                onChangeText={setMembersStr}
-                placeholder="이름을 콤마(,)로 구분하여 입력 (예: 홍길동, 김철수)"
-                placeholderTextColor="#9CA3AF"
-              />
+
+              {/* 검색 결과 리스트 */}
+              {searchResults.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  {searchResults.map((u) => (
+                    <TouchableOpacity
+                      key={u.id}
+                      style={styles.searchItem}
+                      onPress={() => {
+                        setSelectedMembers([...selectedMembers, u]);
+                        setMemberQuery("");
+                        setSearchResults([]);
+                      }}
+                    >
+                      <View style={styles.avatarMini}>
+                        <Text style={styles.avatarTextMini}>{u.nickname?.[0] || "U"}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.searchItemName}>{u.nickname || "Unknown"}</Text>
+                        <Text style={styles.searchItemEmail}>{u.email}</Text>
+                      </View>
+                      <UserPlus size={18} color="#4F46E5" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* 선택된 멤버 태그Cloud */}
+              {selectedMembers.length > 0 && (
+                <View style={styles.tagCloud}>
+                  {selectedMembers.map((m) => (
+                    <View key={m.id} style={styles.memberTag}>
+                      <Text style={styles.memberTagText}>{m.nickname || m.email}</Text>
+                      <TouchableOpacity
+                        onPress={() =>
+                          setSelectedMembers(selectedMembers.filter((sm) => sm.id !== m.id))
+                        }
+                      >
+                        <X size={14} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               <View style={styles.labelRow}>
                 <Text style={styles.label}>기간 설정</Text>
@@ -491,6 +564,82 @@ const styles = StyleSheet.create({
   },
   textArea: {
     height: 100,
+  },
+  // Member Search UI Styles
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+    marginBottom: 8,
+    marginTop: 5,
+  },
+  searchField: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#1E293B',
+  },
+  searchResultsContainer: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  searchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  avatarMini: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarTextMini: {
+    color: '#4F46E5',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  searchItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  searchItemEmail: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  tagCloud: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  memberTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4F46E5',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+  },
+  memberTagText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 6,
   },
   saveButton: {
     backgroundColor: "#4F46E5",

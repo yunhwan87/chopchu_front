@@ -203,12 +203,20 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
 
   // API 프로젝트 데이터만 사용 (MOCK 데이터 제거)
   const unifiedProjects = useMemo(() => {
-    return apiProjects.map(p => ({
-      ...p,
-      startDate: p.start_date || p.startDate,
-      endDate: p.end_date || p.endDate,
-      totalDays: p.total_days || p.totalDays,
-    }));
+    return apiProjects.map(p => {
+      // all_members 데이터를 기반으로 쉼표 구분 문자열 생성
+      const membersStr = (p.all_members || [])
+        .map(m => m.profiles?.nickname || m.profiles?.email || "Unknown")
+        .join(", ");
+
+      return {
+        ...p,
+        startDate: p.start_date || p.startDate,
+        endDate: p.end_date || p.endDate,
+        totalDays: p.total_days || p.totalDays,
+        members: membersStr, // UI 컴포넌트들에서 참조하는 필드명 유지
+      };
+    });
   }, [apiProjects]);
 
   const { logout } = useAuth();

@@ -4,13 +4,19 @@ import { supabase } from '../lib/supabase';
  * 프로젝트 목록 가져오기 (내가 멤버로 속한 프로젝트만)
  */
 export const getProjects = async () => {
+    const { data: userData } = await supabase.auth.getUser();
     const { data, error } = await supabase
         .from('projects')
         .select(`
-      *,
-      project_members!inner(user_id)
-    `)
-        .eq('project_members.user_id', (await supabase.auth.getUser()).data.user?.id);
+            *,
+            project_members!inner(user_id),
+            all_members:project_members (
+                user_id,
+                role,
+                profiles (nickname, email)
+            )
+        `)
+        .eq('project_members.user_id', userData.user?.id);
 
     if (error) throw error;
     return data;

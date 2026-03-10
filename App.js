@@ -182,12 +182,33 @@ const MOCK_DATA = {
 
 
 import { useAuth } from "./src/hooks/useAuth";
+import { useProjects } from "./src/hooks/useProjects";
 import { TempProjectSelectorScreen } from "./screens/TempProjectSelectorScreen";
+import { useEffect, useMemo } from "react";
+
 function MainContent({ onLogout, currentProject, onBackToProjects, currentUserName, onSelectProject }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
+
+  // API 프로젝트 데이터 가져오기
+  const { projects: apiProjects, loading: projectsLoading, fetchProjects, addProject } = useProjects();
   const [projects, setProjects] = useState(MOCK_DATA.projects);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // API 프로젝트 데이터만 사용 (MOCK 데이터 제거)
+  const unifiedProjects = useMemo(() => {
+    return apiProjects.map(p => ({
+      ...p,
+      startDate: p.start_date || p.startDate,
+      endDate: p.end_date || p.endDate,
+      totalDays: p.total_days || p.totalDays,
+    }));
+  }, [apiProjects]);
+
   const { logout } = useAuth();
   const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -201,8 +222,10 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
       case "Dashboard":
         return (
           <DashboardScreen
-            projects={projects}
+            projects={unifiedProjects}
             setProjects={setProjects}
+            addProject={addProject}
+            projectsLoading={projectsLoading}
             schedule={MOCK_DATA.schedule}
             currentProject={currentProject}
             setActiveTab={setActiveTab}
@@ -213,7 +236,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
       case "Schedule":
         return (
           <ScheduleScreen
-            projects={projects}
+            projects={unifiedProjects}
             setProjects={setProjects}
             schedule={schedule}
             expandedProjId={expandedProjId}

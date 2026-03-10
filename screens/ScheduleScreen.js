@@ -107,7 +107,10 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
     setEditModalVisible(false);
   };
 
-  const displayedProjects = projects;
+  // 선택된 프로젝트가 있으면 해당 프로젝트만 표시, 없으면 전체 표시
+  const displayedProjects = expandedProjId
+    ? projects.filter(p => p.id === expandedProjId)
+    : projects;
 
   return (
     <View style={styles.container}>
@@ -216,13 +219,8 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
                         }
                       }
                       return isInRange;
-                    }).sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))}
-                    onCancelRequest={(id) => {
-                      Alert.alert("취소 요청", "해당 일정에 대해 취소 요청을 접수하시겠습니까?", [
-                        { text: "아니오", style: "cancel" },
-                        { text: "예", onPress: () => Alert.alert("안내", "취소 요청이 접수되었습니다.") }
-                      ]);
-                    }}
+                    }).sort((a, b) => new Date(a.date + 'T' + a.time.split(' ~ ')[0]) - new Date(b.date + 'T' + b.time.split(' ~ ')[0]))}
+                    projectStartDate={proj.startDate}
                   />
                 </View>
               )}

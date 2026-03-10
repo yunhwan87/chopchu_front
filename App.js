@@ -284,12 +284,9 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             style={styles.profileCircle}
             onPress={() => setMenuVisible(true)}
           >
-            <Text style={styles.profileText}>{currentUserName || "사용자"}</Text>
+            <Text style={styles.profileText}>{currentUserName || "김제작"}</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.profileCircle} onPress={() => setMenuVisible(true)}>
-          <Text style={styles.profileText}>{`(${currentUserName || "김제작"})`}</Text>
-        </TouchableOpacity>
       </View>
 
 

@@ -8,6 +8,8 @@ import {
   Modal,
   TextInput,
   Platform,
+  Switch,
+  Alert,
 } from "react-native";
 import { Plus, X, Folder } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -19,20 +21,18 @@ import { useRequests } from "../src/hooks/useRequests";
 import { CommunicationLog } from "../components/CommunicationLog";
 
 export const DashboardScreen = (props) => {
-  const { projects = [], schedule, setActiveTab, setExpandedProjId, onSelectProject, currentProject } = props;
+  const { projects = [], schedule, setActiveTab, setExpandedProjId, onSelectProject, currentProject, addProject, projectsLoading } = props;
   const { user } = useAuth();
-  const { projects: apiProjects, loading: projectsLoading, fetchProjects } = useProjects();
   const { requests: receivedRequests, loading: requestsLoading, loadRequests } = useRequests();
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  // 탭 이동 시 요청 목록 갱신 연동
 
   useEffect(() => {
-    if (currentProject?.id && user?.id) {
-      loadRequests(currentProject.id, user.id, 'received');
+    if (user?.id) {
+      // 프로젝트 관계없이 유저가 받은 모든 대기 요청을 로드
+      loadRequests(null, user.id, 'received');
     }
-  }, [currentProject?.id, user?.id, loadRequests]);
+  }, [user?.id, loadRequests]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -87,21 +87,54 @@ export const DashboardScreen = (props) => {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const handleSave = () => {
-    if (!projectName.trim()) return;
-    const newProject = {
-      id: Date.now(),
-      title: projectName,
-      members: membersStr,
-      totalDays,
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
-      note,
-      risks: 0,
-      pendingQuestions: 0,
-    };
-    props.setProjects([...props.projects, newProject]);
-    setModalVisible(false);
+  const handleSave = async () => {
+    if (!projectName.trim()) {
+      Alert.alert("알림", "프로젝트명을 입력해주세요.");
+      return;
+    }
+
+    try {
+      const projectData = {
+        title: projectName,
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        totalDays: totalDays,
+        note: note,
+        // membersStr은 현재 DB 스키마에 따라 처리 방식이 다를 수 있으나, 
+        // 우선 note나 다른 필드에 포함하거나 생략 가능합니다.
+        // 현재는 title과 날짜 정보가 핵심입니다.
+      };
+
+      const result = await addProject(projectData);
+
+      if (result.success) {
+        // 로컬 MOCK 데이터와 싱크를 맞추고 싶다면 남겨두지만, 
+        // 실제로는 apiProjects가 hook 내부에서 업데이트되므로 자동 갱신됩니다.
+        if (props.setProjects && props.projects) {
+          const newMockProject = {
+            id: result.data.id,
+            title: projectName,
+            members: membersStr,
+            totalDays,
+            startDate: formatDate(startDate),
+            endDate: formatDate(endDate),
+            note,
+          };
+          props.setProjects([...props.projects, newMockProject]);
+        }
+
+        setModalVisible(false);
+        setProjectName("");
+        setMembersStr("");
+        setNote("");
+        setStartDate(new Date());
+        setEndDate(new Date());
+      } else {
+        Alert.alert("저장 실패", result.error || "프로젝트를 생성할 수 없습니다.");
+      }
+    } catch (error) {
+      Alert.alert("에러", "시스템 오류가 발생했습니다.");
+    }
   };
 
   return (
@@ -127,7 +160,7 @@ export const DashboardScreen = (props) => {
             requests={receivedRequests}
             currentUserId={user?.id}
             type="received"
-            onRefresh={() => loadRequests(currentProject.id, user.id, 'received')}
+            onRefresh={() => loadRequests(null, user.id, 'received')}
             isDashboard={true}
           />
           {receivedRequests.length === 0 && !requestsLoading && (
@@ -143,11 +176,15 @@ export const DashboardScreen = (props) => {
           <Text style={styles.sectionTitle}>프로젝트 바로가기</Text>
         </View>
         <View style={styles.recentProjectsVerticalList}>
-          {apiProjects.map((proj) => (
+          {projects.map((proj) => (
             <TouchableOpacity
               key={proj.id}
               style={styles.recentProjectCardVertical}
-              onPress={() => onSelectProject && onSelectProject(proj)}
+              onPress={() => {
+                if (onSelectProject) onSelectProject(proj);
+                if (setExpandedProjId) setExpandedProjId(proj.id);
+                if (setActiveTab) setActiveTab("Schedule");
+              }}
             >
               <View style={styles.recentProjectIcon}>
                 <Folder color="#4F46E5" size={20} />
@@ -157,12 +194,12 @@ export const DashboardScreen = (props) => {
                   {proj.title}
                 </Text>
                 <Text style={styles.recentProjectSubtitle}>
-                  {proj.start_date || proj.startDate} ~ {proj.end_date || proj.endDate}
+                  {proj.startDate} ~ {proj.endDate}
                 </Text>
               </View>
             </TouchableOpacity>
           ))}
-          {apiProjects.length === 0 && !projectsLoading && (
+          {projects.length === 0 && !projectsLoading && (
             <Text style={styles.emptyRecentText}>등록된 프로젝트가 없습니다.</Text>
           )}
         </View>

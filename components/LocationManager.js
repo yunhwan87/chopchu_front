@@ -11,7 +11,7 @@ import {
   Switch,
   Alert,
 } from "react-native";
-import { MapPin, Plus, X, Send, User } from "lucide-react-native";
+import { MapPin, Plus, X, Send, User, Clock, DollarSign, AlertCircle, FileText, ChevronDown, ChevronUp, Edit2, Trash2 } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const WAITING_STATUSES = [
@@ -104,25 +104,25 @@ const normalizeRequestThreads = (requests = []) => {
 
       const replies = Array.isArray(req.replies)
         ? req.replies
-            .map((reply, replyIndex) => {
-              if (typeof reply === "string") {
-                return {
-                  id: `rp-${Date.now()}-${index}-${replyIndex}`,
-                  author: "댓글",
-                  text: reply,
-                };
-              }
-
-              if (!reply || typeof reply !== "object" || !reply.text)
-                return null;
-
+          .map((reply, replyIndex) => {
+            if (typeof reply === "string") {
               return {
-                id: reply.id || `rp-${Date.now()}-${index}-${replyIndex}`,
-                author: reply.author || "댓글",
-                text: reply.text,
+                id: `rp-${Date.now()}-${index}-${replyIndex}`,
+                author: "댓글",
+                text: reply,
               };
-            })
-            .filter(Boolean)
+            }
+
+            if (!reply || typeof reply !== "object" || !reply.text)
+              return null;
+
+            return {
+              id: reply.id || `rp-${Date.now()}-${index}-${replyIndex}`,
+              author: reply.author || "댓글",
+              text: reply.text,
+            };
+          })
+          .filter(Boolean)
         : [];
 
       return {
@@ -147,6 +147,7 @@ export const LocationManager = ({
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [detailExpanded, setDetailExpanded] = useState(false);
   const [selectedLoc, setSelectedLoc] = useState(null);
   const [editingLoc, setEditingLoc] = useState(null);
 
@@ -299,6 +300,7 @@ export const LocationManager = ({
 
   const closeDetailModal = () => {
     setDetailVisible(false);
+    setDetailExpanded(false);
     setSelectedLoc(null);
   };
 
@@ -483,16 +485,20 @@ export const LocationManager = ({
             (s) => s.locationId === editingLoc.id || s.location === formName,
           );
           if (!exists) {
+            const scheduleTime = normalizedStartTime && normalizedEndTime
+              ? `${normalizedStartTime} ~ ${normalizedEndTime}`
+              : "미정";
+
             setSchedule([
               ...schedule,
               {
                 id: Date.now(),
                 locationId: editingLoc.id,
-                time: "미정",
+                time: scheduleTime,
                 location: formName,
                 status: "확정",
                 type: "촬영",
-                date: formDate, // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+                date: formDate,
               },
             ]);
           }
@@ -526,16 +532,20 @@ export const LocationManager = ({
 
         // 장소 확정 시 일정에 자동 추가
         if (formStatus === "확정") {
+          const scheduleTime = normalizedStartTime && normalizedEndTime
+            ? `${normalizedStartTime} ~ ${normalizedEndTime}`
+            : "미정";
+
           setSchedule([
             ...schedule,
             {
               id: Date.now(),
               locationId: createdLoc.id,
-              time: "미정",
+              time: scheduleTime,
               location: formName,
               status: "확정",
               type: "촬영",
-              date: formDate, // 해당 프로젝트의 기간과 맞아떨어지도록 date 필드 추가
+              date: formDate,
             },
           ]);
         }
@@ -647,7 +657,7 @@ export const LocationManager = ({
                   style={[
                     styles.requestWaitingOption,
                     requestWaitingFilter === status &&
-                      styles.requestWaitingOptionActive,
+                    styles.requestWaitingOptionActive,
                   ]}
                   onPress={() => {
                     setRequestWaitingFilter(status);
@@ -658,7 +668,7 @@ export const LocationManager = ({
                     style={[
                       styles.requestWaitingOptionText,
                       requestWaitingFilter === status &&
-                        styles.requestWaitingOptionTextActive,
+                      styles.requestWaitingOptionTextActive,
                     ]}
                   >
                     {status}
@@ -765,94 +775,176 @@ export const LocationManager = ({
                 const requestCount = normalizeRequestThreads(
                   selectedLoc.requests || [],
                 ).length;
-                const dateTimeText = `${selectedLoc.date || "-"}${
-                  selectedLoc.startTime && selectedLoc.endTime
-                    ? ` · ${selectedLoc.startTime}~${selectedLoc.endTime}`
-                    : ""
-                }`;
+                const dateTimeText = `${selectedLoc.date || "-"}${selectedLoc.startTime && selectedLoc.endTime
+                  ? `\n${selectedLoc.startTime} ~ ${selectedLoc.endTime}`
+                  : ""
+                  }`;
                 const costText =
                   selectedLoc.cost !== null && selectedLoc.cost !== undefined
-                    ? `₩ ${Number(selectedLoc.cost || 0).toLocaleString("ko-KR")}${
-                        selectedLoc.depositPaid ? " · 선금 Y" : " · 선금 N"
-                      }`
+                    ? `₩ ${Number(selectedLoc.cost || 0).toLocaleString("ko-KR")}${selectedLoc.depositPaid ? " · 선금 Y" : " · 선금 N"
+                    }`
                     : "-";
 
+                const statusStyle = getStatusBadgeStyle(normalizeStatus(selectedLoc.status));
+
                 return (
-                  <View style={styles.detailInfoCard}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>장소명</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {selectedLoc.name || "-"}
-                      </Text>
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                    {/* 기본 정보 카드 */}
+                    <View style={styles.premiumDetailCard}>
+                      {/* 장소명 항목 */}
+                      <View style={styles.premiumRow}>
+                        <View style={styles.premiumLabelGroup}>
+                          <MapPin size={16} color="#6366F1" style={styles.premiumIcon} />
+                          <Text style={styles.premiumLabel}>장소명</Text>
+                        </View>
+                        <Text style={styles.premiumValue}>
+                          {selectedLoc.name || "-"}
+                        </Text>
+                      </View>
+
+                      <View style={styles.premiumSeparator} />
+
+                      {/* 상태 항목 - 배지 스타일 */}
+                      <View style={styles.premiumRow}>
+                        <View style={styles.premiumLabelGroup}>
+                          <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
+                          <Text style={styles.premiumLabel}>상태</Text>
+                        </View>
+                        <View style={[styles.statusMiniBadge, { backgroundColor: statusStyle.bg }]}>
+                          <Text style={[styles.statusMiniBadgeText, { color: statusStyle.text }]}>
+                            {normalizeStatus(selectedLoc.status)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.premiumSeparator} />
+
+                      {/* 촬영일시 항목 */}
+                      <View style={styles.premiumRow}>
+                        <View style={styles.premiumLabelGroup}>
+                          <Clock size={16} color="#6366F1" style={styles.premiumIcon} />
+                          <Text style={styles.premiumLabel}>촬영일시</Text>
+                        </View>
+                        <Text style={styles.premiumValue}>
+                          {dateTimeText}
+                        </Text>
+                      </View>
+
+                      <View style={styles.premiumSeparator} />
+
+                      {/* 담당자 항목 */}
+                      <View style={styles.premiumRow}>
+                        <View style={styles.premiumLabelGroup}>
+                          <User size={16} color="#6366F1" style={styles.premiumIcon} />
+                          <Text style={styles.premiumLabel}>담당자</Text>
+                        </View>
+                        <Text style={styles.premiumValue} numberOfLines={1}>
+                          {selectedLoc.manager || "-"}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>상태</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {normalizeStatus(selectedLoc.status)}
+
+                    {/* 세부 정보 토글 버튼 */}
+                    <TouchableOpacity
+                      style={styles.premiumExpandToggle}
+                      onPress={() => setDetailExpanded(!detailExpanded)}
+                      activeOpacity={0.6}
+                    >
+                      <Text style={styles.premiumExpandText}>
+                        {detailExpanded ? "상세 정보 숨기기" : "상세 정보 더보기"}
                       </Text>
-                    </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>촬영일시</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {dateTimeText}
-                      </Text>
-                    </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>담당자</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {selectedLoc.manager || "-"}
-                      </Text>
-                    </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>비용/선금</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {costText}
-                      </Text>
-                    </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>요청사항</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {requestCount > 0 ? `${requestCount}건` : "-"}
-                      </Text>
-                    </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>리스크</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {selectedLoc.risk || "-"}
-                      </Text>
-                    </View>
-                    <View style={styles.detailDivider} />
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailKey}>메모</Text>
-                      <Text style={styles.detailValue} numberOfLines={1}>
-                        {selectedLoc.memo || "-"}
-                      </Text>
-                    </View>
-                  </View>
+                      {detailExpanded ? (
+                        <ChevronUp size={16} color="#6366F1" />
+                      ) : (
+                        <ChevronDown size={16} color="#6366F1" />
+                      )}
+                    </TouchableOpacity>
+
+                    {/* 확장 섹션 */}
+                    {detailExpanded && (
+                      <View style={styles.premiumExpandSection}>
+                        {selectedLoc.cost !== null && selectedLoc.cost !== undefined && (
+                          <>
+                            <View style={styles.premiumRow}>
+                              <View style={styles.premiumLabelGroup}>
+                                <DollarSign size={16} color="#64748B" style={styles.premiumIcon} />
+                                <Text style={styles.premiumLabel}>비용/선금</Text>
+                              </View>
+                              <Text style={styles.premiumValue}>{costText}</Text>
+                            </View>
+                            {(requestCount > 0 || selectedLoc.risk || selectedLoc.memo) && <View style={styles.premiumSeparator} />}
+                          </>
+                        )}
+
+                        {requestCount > 0 && (
+                          <>
+                            <View style={styles.premiumRow}>
+                              <View style={styles.premiumLabelGroup}>
+                                <Send size={16} color="#64748B" style={styles.premiumIcon} />
+                                <Text style={styles.premiumLabel}>요청사항</Text>
+                              </View>
+                              <Text style={styles.premiumValue}>{requestCount}건</Text>
+                            </View>
+                            {(selectedLoc.risk || selectedLoc.memo) && <View style={styles.premiumSeparator} />}
+                          </>
+                        )}
+
+                        {selectedLoc.risk && (
+                          <>
+                            <View style={styles.premiumRow}>
+                              <View style={styles.premiumLabelGroup}>
+                                <AlertCircle size={16} color="#E11D48" style={styles.premiumIcon} />
+                                <Text style={[styles.premiumLabel, { color: "#E11D48" }]}>리스크</Text>
+                              </View>
+                              <Text style={[styles.premiumValue, { color: "#E11D48" }]}>
+                                {selectedLoc.risk}
+                              </Text>
+                            </View>
+                            {selectedLoc.memo && <View style={styles.premiumSeparator} />}
+                          </>
+                        )}
+
+                        {selectedLoc.memo && (
+                          <View style={{ paddingVertical: 12 }}>
+                            <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
+                              <FileText size={16} color="#64748B" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>메모</Text>
+                            </View>
+                            <View style={styles.premiumMemoContainer}>
+                              <Text style={styles.premiumMemoText}>{selectedLoc.memo}</Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* 모든 정보가 없을 경우 안내 문구 (선택사항) */}
+                        {!(selectedLoc.cost !== null && selectedLoc.cost !== undefined) && requestCount === 0 && !selectedLoc.risk && !selectedLoc.memo && (
+                          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                            <Text style={{ color: '#94A3B8', fontSize: 13 }}>등록된 상세 정보가 없습니다.</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </ScrollView>
                 );
               })()
             ) : null}
 
             <View style={styles.detailFooterRow}>
               <TouchableOpacity
-                style={[styles.editButton, styles.detailActionButton]}
+                style={[styles.premiumEditButton, styles.detailActionButton]}
                 onPress={openEditFromDetail}
                 disabled={isSaving || !selectedLoc}
               >
-                <Text style={styles.editButtonText}>수정</Text>
+                <Edit2 size={16} color="#4F46E5" style={{ marginRight: 6 }} />
+                <Text style={styles.premiumEditButtonText}>수정</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteButton, styles.detailActionButton]}
+                style={[styles.premiumDeleteButton, styles.detailActionButton]}
                 onPress={handleDeleteFromDetail}
                 disabled={isSaving || !selectedLoc}
               >
-                <Text style={styles.deleteButtonText}>삭제</Text>
+                <Trash2 size={16} color="#E11D48" style={{ marginRight: 6 }} />
+                <Text style={styles.premiumDeleteButtonText}>삭제</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1043,7 +1135,7 @@ export const LocationManager = ({
                   ].map((message) => {
                     const mine =
                       String(message.author || "").trim() ===
-                        String(currentUserName || "").trim() &&
+                      String(currentUserName || "").trim() &&
                       Boolean(currentUserName);
                     return (
                       <View
@@ -1140,7 +1232,7 @@ export const LocationManager = ({
                           style={[
                             styles.statusOptionText,
                             formStatus === status &&
-                              styles.statusOptionTextActive,
+                            styles.statusOptionTextActive,
                           ]}
                         >
                           {status}
@@ -1401,16 +1493,16 @@ const styles = StyleSheet.create({
   },
   detailModalContent: {
     backgroundColor: "#FFF",
-    borderRadius: 18,
+    borderRadius: 24,
     width: "100%",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 10,
-    elevation: 5,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    elevation: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1675,37 +1767,122 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  detailInfoCard: {
+  // 프리미엄 상세 모달 스타일
+  premiumDetailCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    backgroundColor: "#F8FAFC",
-    paddingVertical: 4,
-    paddingHorizontal: 12,
+    borderColor: "#F1F5F9",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 12,
   },
-  detailRow: {
-    minHeight: 38,
+  premiumRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    minHeight: 52,
   },
-  detailKey: {
-    width: 72,
-    fontSize: 13,
+  premiumLabelGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  premiumIcon: {
+    marginRight: 8,
+  },
+  premiumLabel: {
+    fontSize: 14,
     color: "#64748B",
     fontWeight: "600",
   },
-  detailValue: {
+  premiumValue: {
+    fontSize: 15,
+    color: "#1E293B",
+    fontWeight: "700",
     flex: 1,
     textAlign: "right",
-    fontSize: 14,
-    color: "#1E293B",
-    fontWeight: "600",
+    marginLeft: 12,
   },
-  detailDivider: {
+  premiumSeparator: {
     height: 1,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#F1F5F9",
+  },
+  statusMiniBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusMiniBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  premiumExpandToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 12,
+  },
+  premiumExpandText: {
+    fontSize: 13,
+    color: "#6366F1",
+    fontWeight: "700",
+    marginRight: 6,
+  },
+  premiumExpandSection: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 8,
+  },
+  premiumMemoContainer: {
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  premiumMemoText: {
+    fontSize: 14,
+    color: "#475569",
+    lineHeight: 22,
+  },
+  premiumEditButton: {
+    flexDirection: "row",
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  premiumEditButtonText: {
+    color: "#4F46E5",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  premiumDeleteButton: {
+    flexDirection: "row",
+    backgroundColor: "#FFF1F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  premiumDeleteButtonText: {
+    color: "#E11D48",
+    fontSize: 15,
+    fontWeight: "700",
   },
   readonlyBox: {
     borderWidth: 1,
@@ -1775,31 +1952,5 @@ const styles = StyleSheet.create({
   detailActionButton: {
     flex: 1,
     marginTop: 0,
-  },
-  editButton: {
-    backgroundColor: "#EEF2FF",
-    borderWidth: 1,
-    borderColor: "#C7D2FE",
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  editButtonText: {
-    color: "#3730A3",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  deleteButton: {
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  deleteButtonText: {
-    color: "#B91C1C",
-    fontSize: 15,
-    fontWeight: "700",
   },
 });

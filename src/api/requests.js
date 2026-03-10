@@ -15,8 +15,11 @@ export const fetchRequests = async (projectId, userId, type) => {
                 sender:profiles!requests_sender_id_fkey(id, email, nickname, avatar_url),
                 receiver:profiles!requests_receiver_id_fkey(id, email, nickname, avatar_url)
             `)
-            .eq('project_id', projectId)
             .order('created_at', { ascending: false });
+
+        if (projectId) {
+            query = query.eq('project_id', projectId);
+        }
 
         if (type === 'sent') {
             query = query.eq('sender_id', userId).neq('status', 'resolved');

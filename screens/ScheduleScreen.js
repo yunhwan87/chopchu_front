@@ -107,13 +107,14 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
     setEditModalVisible(false);
   };
 
+  // 선택된 프로젝트가 있으면 해당 프로젝트만 표시, 없으면 전체 표시
   const displayedProjects = expandedProjId
     ? projects.filter(p => p.id === expandedProjId)
-    : [];
+    : projects;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>선택된 프로젝트 상세일정</Text>
+      <Text style={styles.headerTitle}>프로젝트 상세 일정 리스트</Text>
 
       <ScrollView
         ref={scrollViewRef}
@@ -130,44 +131,56 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
                 setCardLayouts((prev) => ({ ...prev, [proj.id]: layout.y }));
               }}
             >
-              <View style={styles.detailHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.detailTitle}>{proj.title}</Text>
+              {/* 상단 프로젝트 정보 부분을 클릭 가능하게 함 */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (expandedProjId === proj.id) {
+                    setExpandedProjId(null); // 이미 열려있으면 닫기
+                  } else {
+                    setExpandedProjId(proj.id); // 아니면 열기
+                  }
+                }}
+              >
+                <View style={styles.detailHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailTitle}>{proj.title}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => openEditModal(proj)} style={styles.editBtn}>
+                    <Edit2 size={18} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => openEditModal(proj)} style={styles.editBtn}>
-                  <Edit2 size={18} color="#64748B" />
-                </TouchableOpacity>
-              </View>
 
-              <View style={styles.detailSubTextRow}>
-                <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]}>
-                  진행 기간: {proj.startDate} ~ {proj.endDate}
-                </Text>
-                <View style={styles.inlineBadge}>
-                  <Text style={styles.inlineBadgeText}>총 {proj.totalDays}일</Text>
-                </View>
-              </View>
-
-              {proj.members ? (
                 <View style={styles.detailSubTextRow}>
-                  <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]} numberOfLines={1}>
-                    참여 인원: {proj.members}
+                  <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]}>
+                    진행 기간: {proj.startDate} ~ {proj.endDate}
                   </Text>
                   <View style={styles.inlineBadge}>
-                    <Text style={styles.inlineBadgeText}>
-                      총 {proj.members.split(',').filter(m => m.trim().length > 0).length}명
-                    </Text>
+                    <Text style={styles.inlineBadgeText}>총 {proj.totalDays}일</Text>
                   </View>
                 </View>
-              ) : null}
 
-              {proj.note ? (
-                <View style={styles.noteBox}>
-                  <Text style={styles.noteText}>{proj.note}</Text>
-                </View>
-              ) : null}
+                {proj.members ? (
+                  <View style={styles.detailSubTextRow}>
+                    <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]} numberOfLines={1}>
+                      참여 인원: {proj.members}
+                    </Text>
+                    <View style={styles.inlineBadge}>
+                      <Text style={styles.inlineBadgeText}>
+                        총 {proj.members.split(',').filter(m => m.trim().length > 0).length}명
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
 
-              {/* 클릭 시 하단에 타임라인 보드 펼쳐짐 */}
+                {proj.note ? (
+                  <View style={styles.noteBox}>
+                    <Text style={styles.noteText}>{proj.note}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+
+              {/* 촬영 일정 보드 (클릭 시 토글) */}
               {expandedProjId === proj.id && (
                 <View style={styles.timelineWrapper}>
                   <View style={[styles.sectionHeader, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
@@ -206,13 +219,8 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
                         }
                       }
                       return isInRange;
-                    }).sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))}
-                    onCancelRequest={(id) => {
-                      Alert.alert("취소 요청", "해당 일정에 대해 취소 요청을 접수하시겠습니까?", [
-                        { text: "아니오", style: "cancel" },
-                        { text: "예", onPress: () => Alert.alert("안내", "취소 요청이 접수되었습니다.") }
-                      ]);
-                    }}
+                    }).sort((a, b) => new Date(a.date + 'T' + a.time.split(' ~ ')[0]) - new Date(b.date + 'T' + b.time.split(' ~ ')[0]))}
+                    projectStartDate={proj.startDate}
                   />
                 </View>
               )}
@@ -220,7 +228,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
           ))
         ) : (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>홈 화면에서 조회할 프로젝트를 선택해주세요.</Text>
+            <Text style={styles.emptyText}>등록된 프로젝트가 없습니다.</Text>
           </View>
         )}
 

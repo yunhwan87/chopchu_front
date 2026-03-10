@@ -184,12 +184,33 @@ const MOCK_DATA = {
 
 
 import { useAuth } from "./src/hooks/useAuth";
+import { useProjects } from "./src/hooks/useProjects";
 import { TempProjectSelectorScreen } from "./screens/TempProjectSelectorScreen";
-function MainContent({ onLogout, currentProject, onBackToProjects, currentUserName }) {
+import { useEffect, useMemo } from "react";
+
+function MainContent({ onLogout, currentProject, onBackToProjects, currentUserName, onSelectProject }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [locations, setLocations] = useState(MOCK_DATA.locations);
+
+  // API 프로젝트 데이터 가져오기
+  const { projects: apiProjects, loading: projectsLoading, fetchProjects, addProject } = useProjects();
   const [projects, setProjects] = useState(MOCK_DATA.projects);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // API 프로젝트 데이터만 사용 (MOCK 데이터 제거)
+  const unifiedProjects = useMemo(() => {
+    return apiProjects.map(p => ({
+      ...p,
+      startDate: p.start_date || p.startDate,
+      endDate: p.end_date || p.endDate,
+      totalDays: p.total_days || p.totalDays,
+    }));
+  }, [apiProjects]);
+
   const { logout } = useAuth();
   const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -204,18 +225,21 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
       case "Dashboard":
         return (
           <DashboardScreen
-            projects={projects}
+            projects={unifiedProjects}
             setProjects={setProjects}
+            addProject={addProject}
+            projectsLoading={projectsLoading}
             schedule={MOCK_DATA.schedule}
             currentProject={currentProject}
             setActiveTab={setActiveTab}
             setExpandedProjId={setExpandedProjId}
+            onSelectProject={onSelectProject}
           />
         );
       case "Schedule":
         return (
           <ScheduleScreen
-            projects={projects}
+            projects={unifiedProjects}
             setProjects={setProjects}
             schedule={schedule}
             expandedProjId={expandedProjId}
@@ -247,21 +271,19 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             {currentProject ? currentProject.title : "프로젝트 대시보드"}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <TouchableOpacity
-            style={[styles.profileCircle, { backgroundColor: '#F1F5F9' }]}
-            onPress={onBackToProjects}
+            style={styles.profileCircle}
+            onPress={() => setMenuVisible(true)}
           >
-            <Text style={[styles.profileText, { color: '#4F46E5' }]}>목록</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.profileCircle} onPress={logout}>
-            <Text style={styles.profileText}>로그아웃</Text>
+            <Text style={styles.profileText}>{currentUserName || "사용자"}</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.profileCircle} onPress={() => setMenuVisible(true)}>
           <Text style={styles.profileText}>{`(${currentUserName || "김제작"})`}</Text>
         </TouchableOpacity>
       </View>
+
 
       <View style={{ flex: 1 }}>{renderContent()}</View>
 
@@ -273,7 +295,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
-                if (onLogout) onLogout();
+                logout(); // useAuth의 logout 호출
               }}
             >
               <Text style={styles.menuItemText}>로그아웃</Text>
@@ -340,7 +362,7 @@ export default function App() {
   const { user, loading } = useAuth();
   const [currentProject, setCurrentProject] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUserName, setCurrentUserName] = useState("김제작");
+  const [currentUserName, setCurrentUserName] = useState("");
 
   if (loading) {
     return (
@@ -359,13 +381,12 @@ export default function App() {
             setCurrentUserName(userName || "김제작");
           }}
         />
-      ) : !currentProject ? (
-        <TempProjectSelectorScreen onSelectProject={setCurrentProject} />
       ) : (
         <MainContent
           currentProject={currentProject}
-          currentUserName={currentUserName}
+          currentUserName={user?.email || "사용자"}
           onBackToProjects={() => setCurrentProject(null)}
+          onSelectProject={setCurrentProject}
         />
       )}
     </SafeAreaProvider>

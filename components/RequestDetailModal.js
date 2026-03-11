@@ -153,7 +153,8 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh,
             )}
             <KeyboardAvoidingView
                 style={styles.container}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 20 : 0}
             >
                 {/* 헤더 */}
                 <View style={styles.header}>

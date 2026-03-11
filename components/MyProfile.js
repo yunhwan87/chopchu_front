@@ -65,25 +65,14 @@ export const MyProfile = ({ profile, user, onLogout, onBack, updateProfile, upda
 
   return (
     <View style={styles.container}>
-      {/* Profile Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.brandTitle}>OnSync</Text>
-          <Text style={styles.headerSubtitle}>
-            {profile?.nickname || user?.user_metadata?.nickname || "미설정"}
-          </Text>
-        </View>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.headerBtn} onPress={onBack}>
-            <Text style={styles.headerBtnText}>목록</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={onBack}>
-            <Text style={styles.headerBtnText}>
-              {(profile?.nickname || user?.user_metadata?.nickname || user?.email || "U")[0]}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+
+      <TouchableOpacity
+        style={styles.cancelTopBtn}
+        onPress={onBack}
+        activeOpacity={0.6}
+      >
+        <Text style={styles.cancelTopText}>저장 취소</Text>
+      </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.imageSection}>
@@ -379,5 +368,17 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontWeight: "600",
     textDecorationLine: "underline",
+  },
+  cancelTopBtn: {
+    position: 'absolute',
+    top: 15,
+    right: 25,
+    zIndex: 999,
+    padding: 10, // 클릭 영역 확장
+  },
+  cancelTopText: {
+    fontSize: 15,
+    color: "#4F46E5", // 더 잘 보이도록 브랜드 컬러 적용
+    fontWeight: "700",
   },
 });

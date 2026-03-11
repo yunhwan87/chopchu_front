@@ -32,11 +32,26 @@ export const useProjects = () => {
         }
     };
 
+    const deleteProject = async (projectId) => {
+        setLoading(true);
+        try {
+            await projectsApi.deleteProject(projectId);
+            setProjects(prev => prev.filter(p => p.id !== projectId));
+            return { success: true };
+        } catch (err) {
+            setError(err.message);
+            return { success: false, error: err.message };
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return {
         projects,
         loading,
         error,
         fetchProjects,
         addProject,
+        deleteProject,
     };
 };

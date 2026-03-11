@@ -92,3 +92,16 @@ export const getProjectDetails = async (projectId) => {
     if (error) throw error;
     return data;
 };
+
+/**
+ * 프로젝트 삭제
+ */
+export const deleteProject = async (projectId) => {
+    const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+    if (error) throw error;
+    return true;
+};

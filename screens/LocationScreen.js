@@ -43,14 +43,11 @@ export const LocationScreen = ({
     };
   };
 
-  const mapDbStatusToUiStatus = (status, cardStatus) => {
+  const mapDbStatusToUiStatus = (status, _) => {
     if (status === "confirmed") return "확정";
     if (status === "hold") return "보류";
     if (status === "canceled") return "취소";
-    if (cardStatus === "coordinator_pending") return "코디 답변대기중";
-    if (cardStatus === "crew_pending") return "제작진 답변 대기중";
-    if (cardStatus === "pending") return "섭외지 답변 대기중";
-    return "요청중";
+    return "진행 중";
   };
 
   const mapUiStatusToDb = (status) => {
@@ -59,16 +56,11 @@ export const LocationScreen = ({
     if (status === "보류") return { status: "hold", card_status: "pending" };
     if (status === "취소")
       return { status: "canceled", card_status: "pending" };
-    if (status === "코디 답변대기중") {
-      return { status: "requested", card_status: "coordinator_pending" };
+    if (status === "진행 중" || status === "요청중") {
+      return { status: "requested", card_status: null };
     }
-    if (status === "제작진 답변 대기중") {
-      return { status: "requested", card_status: "crew_pending" };
-    }
-    if (status === "섭외지 답변 대기중") {
-      return { status: "requested", card_status: "pending" };
-    }
-    return { status: "requested", card_status: "pending" };
+    // Fallback for any other custom waiting labels if they exist
+    return { status: "requested", card_status: null };
   };
 
   const normalizeThreads = (threads = []) => {
@@ -215,7 +207,7 @@ export const LocationScreen = ({
           : null,
       note: item.memo || null,
       status: mappedStatus.status,
-      card_status: mappedStatus.card_status || item.cardStatus || "pending",
+      card_status: item.cardStatus || mappedStatus.card_status || "pending",
       request_ai_summary: item.aiSummary || null,
       content: requestContent,
     };

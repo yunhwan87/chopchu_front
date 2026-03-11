@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 // 1. 로그인한 유저의 채팅방 목록 가져오기
-export const fetchChatRooms = async (projectId) => {
+export const fetchChatRooms = async (projectId = null) => {
     try {
         const { data: userMemberData, error: memberError } = await supabase
             .from('chat_room_members')
@@ -13,10 +13,13 @@ export const fetchChatRooms = async (projectId) => {
 
         const roomIds = userMemberData.map(m => m.room_id);
 
-        const { data: roomsData, error: roomsError } = await supabase
+        let query = supabase
             .from('chat_rooms')
             .select(`
         *,
+        projects (
+          title
+        ),
         chat_room_members (
           user_id
         ),
@@ -26,8 +29,18 @@ export const fetchChatRooms = async (projectId) => {
         )
       `)
             .in('id', roomIds)
-            .eq('project_id', projectId)
             .order('updated_at', { ascending: false });
+
+        if (projectId) {
+            query = query.eq('project_id', projectId);
+        }
+
+        // messages 가 배열이므로, 개수 제한이나 정렬을 selectQuery 에서 처리하도록 수정 가능하지만
+        // 여기서는 가져온 후 messages[0]을 쓰기 위해 select 내부 정렬 추가
+        // Supabase select 에서 subquery 정렬은 .order('messages.created_at', { ascending: false }) 형식이 가능함
+        query = query.order('created_at', { foreignTable: 'messages', ascending: false });
+
+        const { data: roomsData, error: roomsError } = await query;
 
         if (roomsError) throw roomsError;
 

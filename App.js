@@ -225,7 +225,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
 
   const { logout, profile, user, updateProfile, updatePassword } = useAuth();
   const [schedule, setSchedule] = useState([]); // MOCK_DATA.schedule 대신 빈 배열로 시작
-  
+
   // 프로젝트 변경 시 확정된 장소 기반으로 일정 자동 로드
   useEffect(() => {
     const syncScheduleFromLocations = async () => {
@@ -371,7 +371,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
           />
           <TabItem
             icon={<List size={24} />}
-            label="메인"
+            label="한 눈에"
             active={activeTab === "Schedule"}
             onPress={() => setActiveTab("Schedule")}
           />

@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     createBtn: {
-        backgroundColor: '#FDE047',
+        backgroundColor: '#4F46E5',
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#E2E8F0',
     },
     createBtnText: {
-        color: '#1E293B',
+        color: '#FFF',
         fontSize: 16,
         fontWeight: '700',
     },

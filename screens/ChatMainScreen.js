@@ -12,7 +12,7 @@ export const ChatMainScreen = ({ project, onSetTabBarVisibility }) => {
         }
     }, [currentRoom, onSetTabBarVisibility]);
 
-    if (!project) return null;
+    // if (!project) return null; // 유저 요청: 참여 중인 모든 채팅방이 보이도록 제거
 
     if (currentRoom) {
         return (

@@ -15,11 +15,7 @@ import { MapPin, Plus, X, Send, User, Clock, Calendar, CreditCard, ClipboardList
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
-const WAITING_STATUSES = [
-  "코디 답변대기중",
-  "제작진 답변 대기중",
-  "섭외지 답변 대기중",
-];
+const WAITING_STATUSES = ["진행 중"];
 const WAITING_STATUS_ALIASES = {
   답변대기: "코디 답변대기중",
   "코디 답변 대기중": "코디 답변대기중",
@@ -27,14 +23,14 @@ const WAITING_STATUS_ALIASES = {
   "제작진답변 대기중": "제작진 답변 대기중",
   "섭외지답변 대기중": "섭외지 답변 대기중",
 };
-const STATUS_OPTIONS = ["확정", ...WAITING_STATUSES, "보류", "취소"];
+const STATUS_OPTIONS = ["확정", "진행 중", "보류", "취소"];
 const FILTER_TABS = ["전체", "진행 중", "확정", "취소"];
-const CONFLICT_STATUSES = new Set(["요청중", "확정", ...WAITING_STATUSES]);
+const CONFLICT_STATUSES = new Set(["요청중", "확정", "진행 중"]);
 
 const normalizeStatus = (status) => {
-  if (!status) return "섭외지 답변 대기중";
-  if (status === "섭외 중") return "섭외지 답변 대기중";
-  if (WAITING_STATUS_ALIASES[status]) return WAITING_STATUS_ALIASES[status];
+  if (!status) return "진행 중";
+  if (status === "섭외 중" || status === "요청중" || status === "섭외지 답변 대기중" || status === "코디 답변대기중" || status === "제작진 답변 대기중") return "진행 중";
+  if (WAITING_STATUS_ALIASES[status]) return "진행 중";
   return status;
 };
 
@@ -821,42 +817,42 @@ export const LocationManager = ({
                   <Text style={styles.locName} numberOfLines={1}>
                     {displayName}
                   </Text>
-                  {loc.manager ? (
-                    <Text style={styles.locSubText}>담당자: {loc.manager}</Text>
-                  ) : null}
                   {loc.date ? (
                     <Text style={styles.locSubText}>
-                      일자: {loc.date}
+                      {loc.date}
                       {loc.startTime && loc.endTime
                         ? ` · ${loc.startTime}~${loc.endTime}`
                         : ""}
                     </Text>
                   ) : null}
-                  {threadCount > 0 ? (
-                    <Text style={styles.locSubText}>
-                      요청사항: {threadCount}건 · 댓글 {replyCount}개
-                    </Text>
-                  ) : null}
-                  {loc.cost !== null && loc.cost !== undefined ? (
-                    <Text style={styles.locSubText}>
-                      비용: ₩ {Number(loc.cost || 0).toLocaleString("ko-KR")}
-                      {loc.depositPaid ? " · 선금 Y" : " · 선금 N"}
-                    </Text>
-                  ) : null}
-                  {conflictIds.has(loc.id) ? (
-                    <Text style={styles.conflictText}>
-                      동일 시간대 섭외 충돌 가능
-                    </Text>
-                  ) : null}
                 </View>
               </View>
 
-              <View style={styles.cardRight}>
+              <View style={[styles.cardRight, { alignItems: 'flex-end', gap: 6 }]}>
                 <View
                   style={[styles.badge, { backgroundColor: statusTone.bg }]}
                 >
                   <Text style={[styles.badgeText, { color: statusTone.text }]}>
                     {displayStatus}
+                  </Text>
+                </View>
+
+                {/* 답변 차례 배지 추가 */}
+                <View
+                  style={[
+                    styles.badge, 
+                    { 
+                      backgroundColor: loc.cardStatus === 'coordinator_pending' ? '#FEF3C7' : loc.cardStatus === 'crew_pending' ? '#D1FAE5' : '#F1F5F9',
+                      borderColor: loc.cardStatus === 'coordinator_pending' ? '#F59E0B' : loc.cardStatus === 'crew_pending' ? '#10B981' : '#94A3B8',
+                      borderWidth: 0.5
+                    }
+                  ]}
+                >
+                  <Text style={[
+                    styles.badgeText, 
+                    { color: loc.cardStatus === 'coordinator_pending' ? '#B45309' : loc.cardStatus === 'crew_pending' ? '#065F46' : '#64748B' }
+                  ]}>
+                    {loc.cardStatus === 'coordinator_pending' ? '코디 차례' : loc.cardStatus === 'crew_pending' ? '제작진 차례' : '섭외지 답변 대기'}
                   </Text>
                 </View>
               </View>
@@ -918,22 +914,20 @@ export const LocationManager = ({
 
                 return (
                   <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
-                    {/* 기본 정보 카드 */}
+                    {/* 1. 기본 정보 카드 (항상 노출되는 핵심 정보) */}
                     <View style={styles.premiumDetailCard}>
-                      {/* 장소명 항목 */}
+                      {/* 장소명 */}
                       <View style={styles.premiumRow}>
                         <View style={styles.premiumLabelGroup}>
                           <MapPin size={16} color="#6366F1" style={styles.premiumIcon} />
                           <Text style={styles.premiumLabel}>장소명</Text>
                         </View>
-                        <Text style={styles.premiumValue}>
-                          {selectedLoc.name || "-"}
-                        </Text>
+                        <Text style={styles.premiumValue}>{selectedLoc.name || "-"}</Text>
                       </View>
 
                       <View style={styles.premiumSeparator} />
 
-                      {/* 상태 항목 - 배지 스타일 */}
+                      {/* 상태 */}
                       <View style={styles.premiumRow}>
                         <View style={styles.premiumLabelGroup}>
                           <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
@@ -948,28 +942,39 @@ export const LocationManager = ({
 
                       <View style={styles.premiumSeparator} />
 
-                      {/* 촬영일시 항목 */}
+                      {/* 답변 차례 */}
+                      <View style={styles.premiumRow}>
+                        <View style={styles.premiumLabelGroup}>
+                          <User size={16} color="#6366F1" style={styles.premiumIcon} />
+                          <Text style={styles.premiumLabel}>답변 차례</Text>
+                        </View>
+                        <View style={{ 
+                          backgroundColor: selectedLoc.cardStatus === 'coordinator_pending' ? '#FEF3C7' : selectedLoc.cardStatus === 'crew_pending' ? '#D1FAE5' : '#F1F5F9',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                          borderWidth: 0.5,
+                          borderColor: selectedLoc.cardStatus === 'coordinator_pending' ? '#F59E0B' : selectedLoc.cardStatus === 'crew_pending' ? '#10B981' : '#94A3B8',
+                        }}>
+                          <Text style={{ 
+                            fontSize: 12, 
+                            fontWeight: '700',
+                            color: selectedLoc.cardStatus === 'coordinator_pending' ? '#B45309' : selectedLoc.cardStatus === 'crew_pending' ? '#065F46' : '#64748B' 
+                          }}>
+                            {selectedLoc.cardStatus === 'coordinator_pending' ? '코디 차례' : selectedLoc.cardStatus === 'crew_pending' ? '제작진 차례' : '섭외지 답변 대기'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.premiumSeparator} />
+
+                      {/* 촬영일시 */}
                       <View style={styles.premiumRow}>
                         <View style={styles.premiumLabelGroup}>
                           <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
                           <Text style={styles.premiumLabel}>촬영일시</Text>
                         </View>
-                        <Text style={styles.premiumValue}>
-                          {dateTimeText}
-                        </Text>
-                      </View>
-
-                      <View style={styles.premiumSeparator} />
-
-                      {/* 담당자 항목 */}
-                      <View style={styles.premiumRow}>
-                        <View style={styles.premiumLabelGroup}>
-                          <User size={16} color="#6366F1" style={styles.premiumIcon} />
-                          <Text style={styles.premiumLabel}>담당자</Text>
-                        </View>
-                        <Text style={styles.premiumValue} numberOfLines={1}>
-                          {managerDisplay || "-"}
-                        </Text>
+                        <Text style={styles.premiumValue}>{dateTimeText}</Text>
                       </View>
                     </View>
 
@@ -989,67 +994,107 @@ export const LocationManager = ({
                       )}
                     </TouchableOpacity>
 
-                    {/* 확장 섹션 */}
+                    {/* 2. 상세 정보 (토글) */}
                     {detailExpanded && (
                       <View style={styles.premiumExpandSection}>
-                        {showCost && (
-                          <>
-                            <View style={styles.premiumRow}>
-                              <View style={styles.premiumLabelGroup}>
-                                <CreditCard size={16} color="#64748B" style={styles.premiumIcon} />
-                                <Text style={styles.premiumLabel}>비용/선금</Text>
-                              </View>
-                              <Text style={styles.premiumValue}>{costText}</Text>
+                        {/* 담당자 정보 (분리 표시) */}
+                        {selectedLoc.managerName ? (
+                          <View style={styles.premiumRow}>
+                            <View style={styles.premiumLabelGroup}>
+                              <User size={16} color="#94A3B8" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>담당자 이름</Text>
                             </View>
-                            {(hasRequests || hasMemo || hasAiSummary) && <View style={styles.premiumSeparator} />}
-                          </>
-                        )}
+                            <Text style={styles.premiumValue}>{selectedLoc.managerName}</Text>
+                          </View>
+                        ) : null}
+                        {selectedLoc.managerName && (selectedLoc.managerPhone || selectedLoc.managerEmail) && <View style={styles.premiumSeparator} />}
+                        
+                        {selectedLoc.managerPhone ? (
+                          <View style={styles.premiumRow}>
+                            <View style={styles.premiumLabelGroup}>
+                              <Phone size={16} color="#94A3B8" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>담당자 번호</Text>
+                            </View>
+                            <Text style={styles.premiumValue}>{selectedLoc.managerPhone}</Text>
+                          </View>
+                        ) : null}
+                        {selectedLoc.managerPhone && selectedLoc.managerEmail && <View style={styles.premiumSeparator} />}
 
-                        {hasRequests && (
+                        {selectedLoc.managerEmail ? (
+                          <View style={styles.premiumRow}>
+                            <View style={styles.premiumLabelGroup}>
+                              <Mail size={16} color="#94A3B8" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>담당자 이메일</Text>
+                            </View>
+                            <Text style={styles.premiumValue}>{selectedLoc.managerEmail}</Text>
+                          </View>
+                        ) : null}
+                        {(selectedLoc.managerName || selectedLoc.managerPhone || selectedLoc.managerEmail) && (hasCost || hasMemo || hasAiSummary) && <View style={styles.premiumSeparator} />}
+
+                        {/* 비용 관련 정보 */}
+                        {hasCost ? (
                           <>
                             <View style={styles.premiumRow}>
                               <View style={styles.premiumLabelGroup}>
-                                <Send size={16} color="#64748B" style={styles.premiumIcon} />
-                                <Text style={styles.premiumLabel}>요청사항</Text>
+                                <CreditCard size={16} color="#94A3B8" style={styles.premiumIcon} />
+                                <Text style={styles.premiumLabel}>총 비용</Text>
                               </View>
-                              <Text style={styles.premiumValue}>{requestCount}건</Text>
+                              <Text style={styles.premiumValue}>₩ {Number(selectedLoc.cost).toLocaleString("ko-KR")}</Text>
+                            </View>
+                            <View style={styles.premiumSeparator} />
+                            
+                            {selectedLoc.depositAmount && selectedLoc.depositAmount !== "0.00" && selectedLoc.depositAmount !== 0 ? (
+                              <>
+                                <View style={styles.premiumRow}>
+                                  <View style={styles.premiumLabelGroup}>
+                                    <CreditCard size={16} color="#94A3B8" style={styles.premiumIcon} />
+                                    <Text style={styles.premiumLabel}>선금 금액</Text>
+                                  </View>
+                                  <Text style={styles.premiumValue}>₩ {Number(selectedLoc.depositAmount).toLocaleString("ko-KR")}</Text>
+                                </View>
+                                <View style={styles.premiumSeparator} />
+                              </>
+                            ) : null}
+
+                            <View style={styles.premiumRow}>
+                              <View style={styles.premiumLabelGroup}>
+                                <CreditCard size={16} color="#94A3B8" style={styles.premiumIcon} />
+                                <Text style={styles.premiumLabel}>선금 지불여부</Text>
+                              </View>
+                              <Text style={styles.premiumValue}>{selectedLoc.depositPaid ? "지불됨" : "미지불"}</Text>
                             </View>
                             {(hasMemo || hasAiSummary) && <View style={styles.premiumSeparator} />}
                           </>
-                        )}
+                        ) : null}
 
-
-
-                        {hasAiSummary && (
-                          <View style={{ paddingVertical: 12 }}>
-                            <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
-                              <FileText size={16} color="#6366F1" style={styles.premiumIcon} />
-                              <Text style={[styles.premiumLabel, { color: "#6366F1" }]}>AI 요약 데이터</Text>
-                            </View>
-                            <View style={[styles.premiumMemoContainer, { backgroundColor: "#EEF2FF", borderColor: "#C3DAFE" }]}>
-                              <Text style={[styles.premiumMemoText, { color: "#4338CA" }]}>{selectedLoc.aiSummary}</Text>
-                            </View>
-                            {hasMemo && <View style={[styles.premiumSeparator, { marginTop: 12 }]} />}
-                          </View>
-                        )}
-
+                        {/* 메모 사항 */}
                         {hasMemo && (
                           <View style={{ paddingVertical: 12 }}>
                             <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
-                              <ClipboardList size={16} color="#64748B" style={styles.premiumIcon} />
-                              <Text style={styles.premiumLabel}>진행중인 확인사항</Text>
-
-                              <View style={{ marginLeft: 'auto', backgroundColor: `${cardStatusColor}15`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: cardStatusColor }}>
-                                <Text style={{ color: cardStatusColor, fontSize: 10, fontWeight: '700' }}>{cardStatusLabel}</Text>
-                              </View>
+                              <ClipboardList size={16} color="#6366F1" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>메모 사항</Text>
                             </View>
                             <View style={styles.premiumMemoContainer}>
                               <Text style={styles.premiumMemoText}>{selectedLoc.memo}</Text>
                             </View>
+                            {hasAiSummary && <View style={[styles.premiumSeparator, { marginTop: 12 }]} />}
                           </View>
                         )}
 
-                        {!showCost && !hasRequests && !hasMemo && !hasAiSummary && (
+                        {/* 요청 확정사항 */}
+                        {hasAiSummary && (
+                          <View style={{ paddingVertical: 12 }}>
+                            <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
+                              <FileText size={16} color="#6366F1" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>요청 확정사항</Text>
+                            </View>
+                            <View style={[styles.premiumMemoContainer, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                              <Text style={[styles.premiumMemoText, { color: '#334155' }]}>{selectedLoc.aiSummary}</Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {!selectedLoc.managerName && !selectedLoc.managerPhone && !selectedLoc.managerEmail && !hasCost && !hasMemo && !hasAiSummary && (
                           <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                             <Text style={{ color: '#94A3B8', fontSize: 13 }}>등록된 상세 정보가 없습니다.</Text>
                           </View>
@@ -1381,20 +1426,29 @@ export const LocationManager = ({
 
                 <View style={styles.premiumSeparator} />
                 {/* 8. 메모 사항 */}
-                <View style={[styles.premiumRow, { alignItems: 'flex-start' }]}>
-                  <View style={[styles.premiumLabelGroup, { marginTop: 4 }]}>
+                <View style={{ paddingVertical: 12 }}>
+                  <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
                     <ClipboardList size={16} color="#6366F1" style={styles.premiumIcon} />
                     <Text style={styles.premiumLabel}>메모 사항</Text>
                   </View>
-                  <TextInput
-                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0, minHeight: 60 }]}
-                    value={formMemo}
-                    onChangeText={setFormMemo}
-                    placeholder="메모 입력..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline={true}
-                    textAlignVertical="top"
-                  />
+                  <View style={{ minHeight: 120, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 1, borderRadius: 8, padding: 8 }}>
+                    <TextInput
+                      style={{ 
+                        flex: 1, 
+                        fontSize: 14, 
+                        color: '#334155', 
+                        textAlign: 'left', 
+                        minHeight: 100, 
+                        padding: 4 
+                      }}
+                      value={formMemo}
+                      onChangeText={setFormMemo}
+                      placeholder="추가적인 메모나 확인이 필요한 내용을 입력하세요..."
+                      placeholderTextColor="#9CA3AF"
+                      multiline={true}
+                      textAlignVertical="top"
+                    />
+                  </View>
                 </View>
 
                 <View style={styles.premiumSeparator} />

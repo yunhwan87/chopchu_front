@@ -257,7 +257,7 @@ export const ChatRoomScreen = ({ room, project, onBack }) => {
                     </View>
                 )}
                 {loading ? (
-                    <ActivityIndicator style={{ marginTop: 50 }} color="#FDE047" />
+                    <ActivityIndicator style={{ marginTop: 50 }} color="#4F46E5" />
                 ) : (
                     <FlatList
                         ref={flatListRef}
@@ -284,7 +284,7 @@ export const ChatRoomScreen = ({ room, project, onBack }) => {
                     onPress={handleSend}
                     disabled={!inputText.trim()}
                 >
-                    <Send size={20} color={inputText.trim() ? "#1E293B" : "#94A3B8"} />
+                    <Send size={20} color={inputText.trim() ? "#FFF" : "#94A3B8"} />
                 </TouchableOpacity>
             </View>
 
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     bubbleMe: {
-        backgroundColor: '#FDE047', // 노란색
+        backgroundColor: '#4F46E5', // 테마 파란색
         borderBottomRightRadius: 4,
     },
     bubbleOther: {
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     messageTextMe: {
-        color: '#1E293B',
+        color: '#FFF',
     },
     messageTextOther: {
         color: '#1E293B',
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
         color: '#1E293B',
     },
     sendBtn: {
-        backgroundColor: '#FDE047',
+        backgroundColor: '#4F46E5',
         width: 40,
         height: 40,
         borderRadius: 20,

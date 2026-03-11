@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { LocationManager } from "../components/LocationManager";
 import { useLocations } from "../src/hooks/useLocations";
@@ -157,25 +157,33 @@ export const LocationScreen = ({
 
   const mapDbLocationToUi = useCallback((item) => {
     const { startTime, endTime } = parseShootingTime(item.shooting_time);
-    const managerFromPoc =
+    const dbPoc =
       Array.isArray(item.locations_poc) && item.locations_poc.length > 0
-        ? String(item.locations_poc[0]?.name || "").trim()
-        : "";
+        ? item.locations_poc[0]
+        : {};
+
+    const managerName = String(dbPoc.name || "").trim();
+    const managerPhone = String(dbPoc.phone || "").trim();
+    const managerEmail = String(dbPoc.email || "").trim();
     const defaultRequests = parseContentToRequests(item.content, item.id);
 
     return {
       id: item.id,
       date: item.location_date || "",
       name: item.title || "",
-      manager: managerFromPoc,
+      managerName,
+      managerPhone,
+      managerEmail,
       startTime,
       endTime,
       cost: item.cost,
       depositPaid: Boolean(item.deposit_status),
-      risk: item.risk || "",
+      depositAmount: item.deposit_amount,
       memo: item.note || "",
       requests: defaultRequests,
       status: mapDbStatusToUiStatus(item.status, item.card_status),
+      cardStatus: item.card_status || "pending",
+      aiSummary: item.request_ai_summary || "",
     };
   }, []);
 
@@ -198,23 +206,27 @@ export const LocationScreen = ({
       location_date: item.date || null,
       shooting_time,
       cost:
-        item.cost === null ||
-          item.cost === undefined ||
-          Number.isNaN(Number(item.cost))
-          ? 0
-          : Number(item.cost),
+        item.cost !== undefined && item.cost !== "" ? Number(item.cost) : null,
       deposit_status: Boolean(item.depositPaid),
-      deposit_amount: 0,
-      note: item.memo || "",
+      deposit_amount:
+        item.depositAmount !== undefined && item.depositAmount !== ""
+          ? Number(item.depositAmount)
+          : null,
+      note: item.memo || null,
+      status: mappedStatus.status,
+      card_status: mappedStatus.card_status || item.cardStatus || "pending",
+      request_ai_summary: item.aiSummary || null,
       content: requestContent,
-      ...mappedStatus,
     };
   };
 
   const buildPocsFromUi = (item) => {
-    const manager = String(item.manager || "").trim();
-    if (!manager) return [];
-    return [{ name: manager, phone: "", email: "" }];
+    const name = String(item.managerName || "").trim();
+    const phone = String(item.managerPhone || "").trim();
+    const email = String(item.managerEmail || "").trim();
+    
+    if (!name && !phone && !email) return [];
+    return [{ name, phone, email }];
   };
 
   const syncLocationThreadsToRequests = useCallback(
@@ -301,9 +313,13 @@ export const LocationScreen = ({
         result.data?.id,
         uiItem.requests || [],
       );
-      return mapDbLocationToUi(result.data);
+      const newUiItem = mapDbLocationToUi(result.data);
+      if (setLocations) {
+        setLocations(prev => [newUiItem, ...prev]);
+      }
+      return newUiItem;
     },
-    [addLocation, mapDbLocationToUi, syncLocationThreadsToRequests],
+    [addLocation, mapDbLocationToUi, syncLocationThreadsToRequests, setLocations],
   );
 
   const handleUpdateLocation = useCallback(
@@ -318,9 +334,13 @@ export const LocationScreen = ({
         throw new Error(result.error || "장소 수정에 실패했습니다.");
       }
       await syncLocationThreadsToRequests(locationId, uiItem.requests || []);
-      return mapDbLocationToUi(result.data);
+      const updatedUiItem = mapDbLocationToUi(result.data);
+      if (setLocations) {
+        setLocations(prev => prev.map(l => l.id === locationId ? updatedUiItem : l));
+      }
+      return updatedUiItem;
     },
-    [updateLocation, mapDbLocationToUi, syncLocationThreadsToRequests],
+    [updateLocation, mapDbLocationToUi, syncLocationThreadsToRequests, setLocations],
   );
 
   const handleDeleteLocation = useCallback(
@@ -329,8 +349,11 @@ export const LocationScreen = ({
       if (!result.success) {
         throw new Error(result.error || "장소 삭제에 실패했습니다.");
       }
+      if (setLocations) {
+        setLocations(prev => prev.filter(l => l.id !== locationId));
+      }
     },
-    [removeLocation],
+    [removeLocation, setLocations],
   );
 
   return (

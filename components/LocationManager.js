@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Switch,
   Alert,
 } from "react-native";
-import { MapPin, Plus, X, Send, User, Clock, DollarSign, AlertCircle, FileText, ChevronDown, ChevronUp, Edit2, Trash2, Search } from "lucide-react-native";
+import { MapPin, Plus, X, Send, User, Clock, Calendar, CreditCard, ClipboardList, DollarSign, AlertCircle, FileText, ChevronDown, ChevronUp, Edit2, Trash2, Search, Phone, Mail } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const WAITING_STATUSES = [
@@ -161,15 +161,21 @@ export const LocationManager = ({
 
   const [formDate, setFormDate] = useState("");
   const [formName, setFormName] = useState("");
-  const [formManager, setFormManager] = useState("");
+  const [formManagerName, setFormManagerName] = useState("");
+  const [formManagerPhone, setFormManagerPhone] = useState("");
+  const [formManagerEmail, setFormManagerEmail] = useState("");
   const [formStartTime, setFormStartTime] = useState("");
   const [formEndTime, setFormEndTime] = useState("");
   const [formCost, setFormCost] = useState("");
   const [formDepositPaid, setFormDepositPaid] = useState(false);
-  const [formRisk, setFormRisk] = useState("");
+  const [formDepositAmount, setFormDepositAmount] = useState("");
+  const [formAiSummary, setFormAiSummary] = useState("");
   const [formMemo, setFormMemo] = useState("");
   const [formRequests, setFormRequests] = useState([]);
-  const [formStatus, setFormStatus] = useState("섭외지 답변 대기중");
+  const [formStatus, setFormStatus] = useState("진행 중");
+  const [formStatusExpanded, setFormStatusExpanded] = useState(false);
+  const [formCardStatus, setFormCardStatus] = useState("pending");
+  const [formCardStatusExpanded, setFormCardStatusExpanded] = useState(false);
 
   const [newRequest, setNewRequest] = useState("");
   const [newRequestAuthor, setNewRequestAuthor] = useState(currentUserName);
@@ -185,6 +191,39 @@ export const LocationManager = ({
   useEffect(() => {
     setNewRequestAuthor((prev) => prev || currentUserName || "");
   }, [currentUserName]);
+
+  // Handle auto-switching cardStatus when memo is being edited
+  const [initialMemo, setInitialMemo] = useState("");
+  useEffect(() => {
+    if (editingLoc) {
+      setInitialMemo(editingLoc.memo || "");
+    } else {
+      setInitialMemo("");
+    }
+  }, [editingLoc]);
+
+  useEffect(() => {
+    // Only trigger if edit mode and memo has actually changed from initial value
+    if (isEditMode && formMemo !== initialMemo) {
+      const authorRole = String(currentUserName || "").trim();
+      const managerNameStr = String(formManagerName || "").trim();
+
+      // Heuristic: If author matches manager, we assume they are the Co-ordinator/Manager replying
+      // If author is something else (e.g. "김제작", "제작팀"), it's the Crew requesting.
+      // Default fallback: if we can't tell, keep it as is, or switch to coordinator pending if changed.
+
+      let nextStatus = formCardStatus;
+      if (authorRole && managerNameStr && authorRole === managerNameStr) {
+        // Coordinator edited memo -> needs Crew to check
+        nextStatus = "crew_pending";
+      } else {
+        // Non-manager (mostly Crew) edited memo -> needs Coordinator to check
+        nextStatus = "coordinator_pending";
+      }
+
+      setFormCardStatus(nextStatus);
+    }
+  }, [formMemo, isEditMode, currentUserName, formManagerName]);
 
   const dateOptions = useMemo(() => {
     if (!project?.startDate) return [{ label: "전체", value: "전체" }];
@@ -271,15 +310,21 @@ export const LocationManager = ({
     setEditingLoc(null);
     setFormDate("");
     setFormName("");
-    setFormManager("");
+    setFormManagerName("");
+    setFormManagerPhone("");
+    setFormManagerEmail("");
     setFormStartTime("");
     setFormEndTime("");
     setFormCost("");
     setFormDepositPaid(false);
-    setFormRisk("");
+    setFormDepositAmount("");
+    setFormAiSummary("");
     setFormMemo("");
     setFormRequests([]);
-    setFormStatus("섭외지 답변 대기중");
+    setFormStatus("진행 중");
+    setFormStatusExpanded(false);
+    setFormCardStatus("pending");
+    setFormCardStatusExpanded(false);
     setNewRequest("");
     setNewRequestAuthor(currentUserName);
     setReplyDrafts({});
@@ -298,19 +343,29 @@ export const LocationManager = ({
     setEditingLoc(loc);
     setFormDate(loc.date || "");
     setFormName(loc.name || "");
-    setFormManager(loc.manager || "");
+    setFormManagerName(loc.managerName || "");
+    setFormManagerPhone(loc.managerPhone || "");
+    setFormManagerEmail(loc.managerEmail || "");
     setFormStartTime(loc.startTime || "");
     setFormEndTime(loc.endTime || "");
     setFormCost(
-      loc.cost !== undefined && loc.cost !== null
+      loc.cost !== undefined && loc.cost !== null && loc.cost !== 0 && loc.cost !== "0.00"
         ? String(loc.cost).replace(/,/g, "")
         : "",
     );
     setFormDepositPaid(Boolean(loc.depositPaid));
-    setFormRisk(loc.risk || "");
+    setFormDepositAmount(
+      loc.depositAmount !== undefined && loc.depositAmount !== null && loc.depositAmount !== 0 && loc.depositAmount !== "0.00"
+        ? String(loc.depositAmount).replace(/,/g, "")
+        : "",
+    );
     setFormMemo(loc.memo || "");
     setFormRequests(normalizeRequestThreads(loc.requests || []));
     setFormStatus(normalizeStatus(loc.status));
+    setFormStatusExpanded(false);
+    setFormCardStatus(loc.cardStatus || "pending");
+    setFormCardStatusExpanded(false);
+    setFormAiSummary(loc.aiSummary || "");
     setNewRequest("");
     setNewRequestAuthor(currentUserName);
     setReplyDrafts({});
@@ -486,15 +541,19 @@ export const LocationManager = ({
       const payload = {
         date: formDate,
         name: formName.trim(),
-        manager: formManager.trim(),
+        managerName: formManagerName.trim(),
+        managerPhone: formManagerPhone.trim(),
+        managerEmail: formManagerEmail.trim(),
         startTime: normalizedStartTime,
         endTime: normalizedEndTime,
         cost: costValue,
         depositPaid: formDepositPaid,
-        risk: formRisk.trim(),
+        depositAmount: formDepositAmount,
         memo: formMemo.trim(),
         requests: normalizedRequests,
         status: formStatus,
+        cardStatus: formCardStatus,
+        aiSummary: formAiSummary,
       };
 
       try {
@@ -544,14 +603,26 @@ export const LocationManager = ({
         setIsSaving(false);
       }
     } else {
+      const parsedCost = Number(formCost);
+      const costValue = Number.isFinite(parsedCost) ? parsedCost : null;
+
       const newLoc = {
         id: Date.now(),
         date: formDate,
         name: formName.trim(),
+        managerName: formManagerName.trim(),
+        managerPhone: formManagerPhone.trim(),
+        managerEmail: formManagerEmail.trim(),
         startTime: normalizedStartTime,
         endTime: normalizedEndTime,
+        cost: costValue,
+        depositPaid: formDepositPaid,
+        depositAmount: formDepositAmount,
+        memo: formMemo.trim(),
         requests: normalizedRequests,
-        status: "섭외지 답변 대기중",
+        status: formStatus,
+        cardStatus: formCardStatus,
+        aiSummary: formAiSummary,
       };
 
       try {
@@ -650,7 +721,7 @@ export const LocationManager = ({
           </View>
 
           {/* Date Dropdown */}
-          <View style={{ zIndex: 9, marginLeft: 16, flexDirection: "row", alignItems: "center" }}>
+          <View style={{ zIndex: 9, marginLeft: 6, flexDirection: "row", alignItems: "center" }}>
             <Text style={styles.dropdownTitle}>일자별</Text>
             <TouchableOpacity
               style={styles.dropdownButton}
@@ -771,9 +842,6 @@ export const LocationManager = ({
                       {loc.depositPaid ? " · 선금 Y" : " · 선금 N"}
                     </Text>
                   ) : null}
-                  {loc.risk ? (
-                    <Text style={styles.riskText}>리스크: {loc.risk}</Text>
-                  ) : null}
                   {conflictIds.has(loc.id) ? (
                     <Text style={styles.conflictText}>
                       동일 시간대 섭외 충돌 가능
@@ -822,13 +890,30 @@ export const LocationManager = ({
                   ? `\n${selectedLoc.startTime} ~ ${selectedLoc.endTime}`
                   : ""
                   }`;
-                const costText =
-                  selectedLoc.cost !== null && selectedLoc.cost !== undefined
-                    ? `₩ ${Number(selectedLoc.cost || 0).toLocaleString("ko-KR")}${selectedLoc.depositPaid ? " · 선금 Y" : " · 선금 N"
-                    }`
-                    : "-";
+                const hasCost = selectedLoc.cost && selectedLoc.cost !== "0.00" && selectedLoc.cost !== 0;
+                const costText = hasCost
+                  ? `₩ ${Number(selectedLoc.cost).toLocaleString("ko-KR")}${selectedLoc.depositPaid && selectedLoc.depositAmount && selectedLoc.depositAmount !== "0.00" && selectedLoc.depositAmount !== 0
+                    ? ` (선금 ₩ ${Number(selectedLoc.depositAmount).toLocaleString("ko-KR")})`
+                    : selectedLoc.depositPaid ? " (선금 입금완료)" : " (선금 X)"
+                  }`
+                  : "-";
+
+                const showCost = hasCost || selectedLoc.depositPaid;
+                const hasRequests = requestCount > 0;
+                const hasMemo = Boolean(selectedLoc.memo);
+                const hasAiSummary = Boolean(selectedLoc.aiSummary);
 
                 const statusStyle = getStatusBadgeStyle(normalizeStatus(selectedLoc.status));
+                const cardStatusColor = selectedLoc.cardStatus === 'coordinator_pending' ? '#F59E0B' : selectedLoc.cardStatus === 'crew_pending' ? '#10B981' : '#64748B';
+                const cardStatusLabel = selectedLoc.cardStatus === 'coordinator_pending' ? '코디네이터 확인 필요' : selectedLoc.cardStatus === 'crew_pending' ? '제작팀 확인 필요' : '대기중';
+
+                const managerDisplay = [
+                  selectedLoc.managerName,
+                  selectedLoc.managerPhone,
+                  selectedLoc.managerEmail,
+                ]
+                  .filter(Boolean)
+                  .join(" / ");
 
                 return (
                   <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
@@ -865,7 +950,7 @@ export const LocationManager = ({
                       {/* 촬영일시 항목 */}
                       <View style={styles.premiumRow}>
                         <View style={styles.premiumLabelGroup}>
-                          <Clock size={16} color="#6366F1" style={styles.premiumIcon} />
+                          <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
                           <Text style={styles.premiumLabel}>촬영일시</Text>
                         </View>
                         <Text style={styles.premiumValue}>
@@ -882,7 +967,7 @@ export const LocationManager = ({
                           <Text style={styles.premiumLabel}>담당자</Text>
                         </View>
                         <Text style={styles.premiumValue} numberOfLines={1}>
-                          {selectedLoc.manager || "-"}
+                          {managerDisplay || "-"}
                         </Text>
                       </View>
                     </View>
@@ -906,20 +991,20 @@ export const LocationManager = ({
                     {/* 확장 섹션 */}
                     {detailExpanded && (
                       <View style={styles.premiumExpandSection}>
-                        {selectedLoc.cost !== null && selectedLoc.cost !== undefined && (
+                        {showCost && (
                           <>
                             <View style={styles.premiumRow}>
                               <View style={styles.premiumLabelGroup}>
-                                <DollarSign size={16} color="#64748B" style={styles.premiumIcon} />
+                                <CreditCard size={16} color="#64748B" style={styles.premiumIcon} />
                                 <Text style={styles.premiumLabel}>비용/선금</Text>
                               </View>
                               <Text style={styles.premiumValue}>{costText}</Text>
                             </View>
-                            {(requestCount > 0 || selectedLoc.risk || selectedLoc.memo) && <View style={styles.premiumSeparator} />}
+                            {(hasRequests || hasMemo || hasAiSummary) && <View style={styles.premiumSeparator} />}
                           </>
                         )}
 
-                        {requestCount > 0 && (
+                        {hasRequests && (
                           <>
                             <View style={styles.premiumRow}>
                               <View style={styles.premiumLabelGroup}>
@@ -928,30 +1013,34 @@ export const LocationManager = ({
                               </View>
                               <Text style={styles.premiumValue}>{requestCount}건</Text>
                             </View>
-                            {(selectedLoc.risk || selectedLoc.memo) && <View style={styles.premiumSeparator} />}
+                            {(hasMemo || hasAiSummary) && <View style={styles.premiumSeparator} />}
                           </>
                         )}
 
-                        {selectedLoc.risk && (
-                          <>
-                            <View style={styles.premiumRow}>
-                              <View style={styles.premiumLabelGroup}>
-                                <AlertCircle size={16} color="#E11D48" style={styles.premiumIcon} />
-                                <Text style={[styles.premiumLabel, { color: "#E11D48" }]}>리스크</Text>
-                              </View>
-                              <Text style={[styles.premiumValue, { color: "#E11D48" }]}>
-                                {selectedLoc.risk}
-                              </Text>
-                            </View>
-                            {selectedLoc.memo && <View style={styles.premiumSeparator} />}
-                          </>
-                        )}
 
-                        {selectedLoc.memo && (
+
+                        {hasAiSummary && (
                           <View style={{ paddingVertical: 12 }}>
                             <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
-                              <FileText size={16} color="#64748B" style={styles.premiumIcon} />
-                              <Text style={styles.premiumLabel}>메모</Text>
+                              <FileText size={16} color="#6366F1" style={styles.premiumIcon} />
+                              <Text style={[styles.premiumLabel, { color: "#6366F1" }]}>AI 요약 데이터</Text>
+                            </View>
+                            <View style={[styles.premiumMemoContainer, { backgroundColor: "#EEF2FF", borderColor: "#C3DAFE" }]}>
+                              <Text style={[styles.premiumMemoText, { color: "#4338CA" }]}>{selectedLoc.aiSummary}</Text>
+                            </View>
+                            {hasMemo && <View style={[styles.premiumSeparator, { marginTop: 12 }]} />}
+                          </View>
+                        )}
+
+                        {hasMemo && (
+                          <View style={{ paddingVertical: 12 }}>
+                            <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
+                              <ClipboardList size={16} color="#64748B" style={styles.premiumIcon} />
+                              <Text style={styles.premiumLabel}>진행중인 확인사항</Text>
+
+                              <View style={{ marginLeft: 'auto', backgroundColor: `${cardStatusColor}15`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: cardStatusColor }}>
+                                <Text style={{ color: cardStatusColor, fontSize: 10, fontWeight: '700' }}>{cardStatusLabel}</Text>
+                              </View>
                             </View>
                             <View style={styles.premiumMemoContainer}>
                               <Text style={styles.premiumMemoText}>{selectedLoc.memo}</Text>
@@ -959,8 +1048,7 @@ export const LocationManager = ({
                           </View>
                         )}
 
-                        {/* 모든 정보가 없을 경우 안내 문구 (선택사항) */}
-                        {!(selectedLoc.cost !== null && selectedLoc.cost !== undefined) && requestCount === 0 && !selectedLoc.risk && !selectedLoc.memo && (
+                        {!showCost && !hasRequests && !hasMemo && !hasAiSummary && (
                           <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                             <Text style={{ color: '#94A3B8', fontSize: 13 }}>등록된 상세 정보가 없습니다.</Text>
                           </View>
@@ -1007,284 +1095,318 @@ export const LocationManager = ({
             </View>
 
             <ScrollView
-              style={{ maxHeight: "80%" }}
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ paddingBottom: 30 }}
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.label}>촬영일자</Text>
-              <TouchableOpacity
-                style={[styles.input, { justifyContent: "center" }]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={{ color: formDate ? "#1E293B" : "#9CA3AF" }}>
-                  {formDate || "날짜 선택"}
-                </Text>
-              </TouchableOpacity>
+              {/* 폼 카드 컨테이너 */}
+              <View style={[styles.premiumDetailCard, { padding: 16 }]}>
+                {/* 1. 장소명 */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <MapPin size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>장소명</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
+                    value={formName}
+                    onChangeText={setFormName}
+                    placeholder="예: 에펠탑 광장*"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
 
-              {showDatePicker &&
-                (Platform.OS === "ios" ? (
-                  <View style={{ marginBottom: 15 }}>
+                <View style={styles.premiumSeparator} />
+
+                {/* 2. 섭외 상태 */}
+                <View style={[styles.premiumRow, { zIndex: 50 }]}>
+                  <View style={styles.premiumLabelGroup}>
+                    <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>섭외 상태</Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <TouchableOpacity
+                      style={[styles.dropdownButton, { minWidth: 120, height: 36, paddingVertical: 0 }]}
+                      onPress={() => {
+                        setFormStatusExpanded(!formStatusExpanded);
+                        setFormCardStatusExpanded(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownButtonText}>{formStatus}</Text>
+                      <ChevronDown size={14} color="#64748B" />
+                    </TouchableOpacity>
+                    {formStatusExpanded && (
+                      <View style={[styles.dropdownMenu, { top: 40, right: 0, left: 'auto', minWidth: 120, zIndex: 100 }]}>
+                        {['확정', '진행 중', '보류'].map((status) => (
+                          <TouchableOpacity
+                            key={status}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setFormStatus(status);
+                              setFormStatusExpanded(false);
+                            }}
+                          >
+                            <Text style={[
+                              styles.dropdownItemText,
+                              formStatus === status && styles.dropdownItemTextActive
+                            ]}>{status}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 3. 답변 차례 */}
+                <View style={[styles.premiumRow, { zIndex: 40 }]}>
+                  <View style={styles.premiumLabelGroup}>
+                    <User size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>답변 차례</Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <TouchableOpacity
+                      style={[styles.dropdownButton, { minWidth: 140, height: 36, paddingVertical: 0 }]}
+                      onPress={() => {
+                        setFormCardStatusExpanded(!formCardStatusExpanded);
+                        setFormStatusExpanded(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownButtonText}>
+                        {formCardStatus === 'coordinator_pending' ? '코디 차례' : formCardStatus === 'crew_pending' ? '제작진 차례' : '섭외지 답변 대기 중'}
+                      </Text>
+                      <ChevronDown size={14} color="#64748B" />
+                    </TouchableOpacity>
+                    {formCardStatusExpanded && (
+                      <View style={[styles.dropdownMenu, { top: 40, right: 0, left: 'auto', minWidth: 140, zIndex: 100 }]}>
+                        {[
+                          { label: "코디 차례", value: "coordinator_pending" },
+                          { label: "제작진 차례", value: "crew_pending" },
+                          { label: "섭외지 답변 대기 중", value: "pending" },
+                        ].map((opt) => (
+                          <TouchableOpacity
+                            key={opt.value}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setFormCardStatus(opt.value);
+                              setFormCardStatusExpanded(false);
+                            }}
+                          >
+                            <Text style={[
+                              styles.dropdownItemText,
+                              formCardStatus === opt.value && styles.dropdownItemTextActive
+                            ]}>{opt.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 4. 촬영 일시 (촬영일자) */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>촬영일시</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={[styles.premiumValue, { color: formDate ? "#1E293B" : "#9CA3AF" }]}>
+                      {formDate || "날짜 선택"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {showDatePicker && (
+                  <View style={{ marginBottom: 15, paddingHorizontal: 10 }}>
                     <DateTimePicker
                       value={dateObj}
                       mode="date"
-                      display="spinner"
+                      display={Platform.OS === "ios" ? "spinner" : "default"}
                       onChange={onChangeDate}
                     />
-                    <TouchableOpacity
-                      onPress={() => setShowDatePicker(false)}
-                      style={styles.pickerDone}
-                    >
-                      <Text style={styles.pickerDoneText}>완료</Text>
-                    </TouchableOpacity>
+                    {Platform.OS === "ios" && (
+                      <TouchableOpacity
+                        onPress={() => setShowDatePicker(false)}
+                        style={styles.pickerDone}
+                      >
+                        <Text style={styles.pickerDoneText}>완료</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                ) : (
-                  <DateTimePicker
-                    value={dateObj}
-                    mode="date"
-                    display="default"
-                    onChange={onChangeDate}
-                  />
-                ))}
+                )}
 
-              <Text style={styles.label}>장소명</Text>
-              <TextInput
-                style={styles.input}
-                value={formName}
-                onChangeText={setFormName}
-                placeholder="예: 에펠탑 광장*"
-                placeholderTextColor="#9CA3AF"
-              />
+                <View style={styles.premiumSeparator} />
 
-              <View style={styles.timeRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>시작 시간</Text>
+                {/* 5. 촬영 시간 */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Clock size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>촬영시간</Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <TextInput
+                        style={[styles.premiumValue, { width: 68, height: 36, textAlign: 'center', padding: 0, paddingVertical: 0, backgroundColor: '#F8FAFC', borderRadius: 8, marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' }]}
+                        value={formStartTime}
+                        onChangeText={(value) =>
+                          setFormStartTime(String(value || "").replace(/\D/g, "").slice(0, 4))
+                        }
+                        onBlur={() => setFormStartTime((prev) => normalizeTimeValue(prev))}
+                        placeholder="09:00"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="number-pad"
+                      />
+                      <Text style={{ color: '#64748B', marginHorizontal: 4 }}>~</Text>
+                      <TextInput
+                        style={[styles.premiumValue, { width: 68, height: 36, textAlign: 'center', padding: 0, paddingVertical: 0, backgroundColor: '#F8FAFC', borderRadius: 8, marginLeft: 8, borderWidth: 1, borderColor: '#E2E8F0' }]}
+                        value={formEndTime}
+                        onChangeText={(value) =>
+                          setFormEndTime(String(value || "").replace(/\D/g, "").slice(0, 4))
+                        }
+                        onBlur={() => setFormEndTime((prev) => normalizeTimeValue(prev))}
+                        placeholder="11:00"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                    {timeError ? <Text style={styles.errorText}>{timeError}</Text> : null}
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+                {/* 6. 담당자 영역 분리 */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <User size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>담당자 이름</Text>
+                  </View>
                   <TextInput
-                    style={styles.input}
-                    value={formStartTime}
-                    onChangeText={(value) =>
-                      setFormStartTime(String(value || "").replace(/\D/g, "").slice(0, 4))
-                    }
-                    onBlur={() =>
-                      setFormStartTime((prev) => normalizeTimeValue(prev))
-                    }
-                    placeholder="09:00"
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
+                    value={formManagerName}
+                    onChangeText={setFormManagerName}
+                    placeholder="예: 김매니저"
                     placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
                   />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>종료 시간</Text>
+
+                <View style={styles.premiumSeparator} />
+
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Phone size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>담당자 전화번호</Text>
+                  </View>
                   <TextInput
-                    style={styles.input}
-                    value={formEndTime}
-                    onChangeText={(value) =>
-                      setFormEndTime(String(value || "").replace(/\D/g, "").slice(0, 4))
-                    }
-                    onBlur={() => setFormEndTime((prev) => normalizeTimeValue(prev))}
-                    placeholder="11:00"
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
+                    value={formManagerPhone}
+                    onChangeText={setFormManagerPhone}
+                    placeholder="010-0000-0000"
                     placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
+                    keyboardType="phone-pad"
                   />
                 </View>
-              </View>
-              {timeError ? (
-                <Text style={styles.errorText}>{timeError}</Text>
-              ) : null}
 
-              {isEditMode ? (
-                <>
-                  <Text style={styles.label}>담당자</Text>
+                <View style={styles.premiumSeparator} />
+
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Mail size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>담당자 이메일</Text>
+                  </View>
                   <TextInput
-                    style={styles.input}
-                    value={formManager}
-                    onChangeText={setFormManager}
-                    placeholder="예: 김매니저*"
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
+                    value={formManagerEmail}
+                    onChangeText={setFormManagerEmail}
+                    placeholder="이메일 (선택)"
                     placeholderTextColor="#9CA3AF"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                   />
+                </View>
 
-                  <Text style={styles.label}>비용</Text>
+                <View style={styles.premiumSeparator} />
+                {/* 7. 비용/선금 영역 분리 */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <CreditCard size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>총 비용</Text>
+                  </View>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
                     value={formCost}
                     onChangeText={setFormCost}
-                    placeholder="숫자만 입력"
+                    placeholder="총 비용 (숫자만)"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="numeric"
                   />
-
-                  <View style={styles.switchRow}>
-                    <Text style={styles.labelInline}>선금 여부</Text>
-                    <Switch
-                      value={formDepositPaid}
-                      onValueChange={setFormDepositPaid}
-                    />
-                  </View>
-
-                  <Text style={styles.label}>리스크</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formRisk}
-                    onChangeText={setFormRisk}
-                    placeholder="예: 우천 시 촬영 불가*"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </>
-              ) : null}
-
-              <Text style={styles.label}>요청사항</Text>
-              <View style={styles.requestComposerRow}>
-                <TextInput
-                  style={styles.requestComposerInput}
-                  value={newRequest}
-                  onChangeText={setNewRequest}
-                  placeholder="요청사항 입력..."
-                  placeholderTextColor="#9CA3AF"
-                  onSubmitEditing={addRequestThread}
-                />
-                <TouchableOpacity
-                  style={styles.addRequestBtn}
-                  onPress={addRequestThread}
-                >
-                  <Send size={16} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-
-              {formRequests.map((thread) => (
-                <View key={thread.id} style={styles.miniThreadCard}>
-                  <View style={styles.threadHeader}>
-                    <View style={styles.miniThreadTitleRow}>
-                      <User size={14} color="#64748B" />
-                      <Text style={styles.threadAuthor}>{thread.author}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => removeRequestThread(thread.id)}
-                      style={styles.threadDeleteBtn}
-                    >
-                      <X size={14} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  </View>
-                  {[
-                    {
-                      id: `root-${thread.id}`,
-                      author: thread.author,
-                      text: thread.text,
-                      isRoot: true,
-                    },
-                    ...(thread.replies || []).map((reply) => ({
-                      id: reply.id,
-                      author: reply.author,
-                      text: reply.text,
-                      isRoot: false,
-                    })),
-                  ].map((message) => {
-                    const mine =
-                      String(message.author || "").trim() ===
-                      String(currentUserName || "").trim() &&
-                      Boolean(currentUserName);
-                    return (
-                      <View
-                        key={message.id}
-                        style={[
-                          styles.miniMessageRow,
-                          mine
-                            ? styles.miniMessageRowMine
-                            : styles.miniMessageRowOther,
-                        ]}
-                      >
-                        {!mine ? (
-                          <View style={styles.miniAvatar}>
-                            <User size={12} color="#64748B" />
-                          </View>
-                        ) : null}
-                        <View
-                          style={[
-                            styles.miniMessageBubble,
-                            mine
-                              ? styles.miniBubbleMine
-                              : styles.miniBubbleOther,
-                          ]}
-                        >
-                          {!mine ? (
-                            <Text style={styles.miniSenderText}>
-                              {message.author || "댓글"}
-                            </Text>
-                          ) : null}
-                          <Text
-                            style={[
-                              styles.miniMessageText,
-                              mine
-                                ? styles.miniMessageTextMine
-                                : styles.miniMessageTextOther,
-                            ]}
-                          >
-                            {message.text}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-
-                  <View style={styles.replyComposerRow}>
-                    <TextInput
-                      style={styles.replyComposerInput}
-                      value={replyDrafts[thread.id] || ""}
-                      onChangeText={(value) =>
-                        setReplyDrafts((prev) => ({
-                          ...prev,
-                          [thread.id]: value,
-                        }))
-                      }
-                      placeholder="댓글 입력..."
-                      placeholderTextColor="#9CA3AF"
-                      onSubmitEditing={() => addReply(thread.id)}
-                    />
-                    <TouchableOpacity
-                      style={styles.replySubmitBtn}
-                      onPress={() => addReply(thread.id)}
-                    >
-                      <Send size={15} color="#FFF" />
-                    </TouchableOpacity>
-                  </View>
                 </View>
-              ))}
 
-              {isEditMode ? (
-                <>
-                  <Text style={styles.label}>메모</Text>
+                <View style={styles.premiumSeparator} />
+
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <CreditCard size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>선금 금액</Text>
+                  </View>
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
+                    value={formDepositAmount}
+                    onChangeText={setFormDepositAmount}
+                    placeholder="선금 금액 (숫자만)"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <CreditCard size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>선금 지불여부</Text>
+                  </View>
+                  <Switch
+                    value={formDepositPaid}
+                    onValueChange={setFormDepositPaid}
+                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                  />
+                </View>
+
+                <View style={styles.premiumSeparator} />
+                {/* 8. 메모 사항 */}
+                <View style={[styles.premiumRow, { alignItems: 'flex-start' }]}>
+                  <View style={[styles.premiumLabelGroup, { marginTop: 4 }]}>
+                    <ClipboardList size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>메모 사항</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0, minHeight: 60 }]}
                     value={formMemo}
                     onChangeText={setFormMemo}
-                    placeholder="추가 메모를 입력하세요"
+                    placeholder="메모 입력..."
                     placeholderTextColor="#9CA3AF"
                     multiline={true}
                     textAlignVertical="top"
                   />
+                </View>
 
-                  <Text style={[styles.label, { marginTop: 20 }]}>상태</Text>
-                  <View style={styles.statusRow}>
-                    {STATUS_OPTIONS.map((status) => (
-                      <TouchableOpacity
-                        key={status}
-                        style={[
-                          styles.statusOption,
-                          formStatus === status && styles.statusOptionActive,
-                        ]}
-                        onPress={() => setFormStatus(status)}
-                      >
-                        <Text
-                          style={[
-                            styles.statusOptionText,
-                            formStatus === status &&
-                            styles.statusOptionTextActive,
-                          ]}
-                        >
-                          {status}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                <View style={styles.premiumSeparator} />
+                {/* 9. 요청 확정사항 */}
+                <View style={{ paddingVertical: 12 }}>
+                  <Text style={[styles.premiumLabel, { marginBottom: 8 }]}>요청 확정사항</Text>
+                  <View style={{ minHeight: 120, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 1, borderRadius: 8, padding: 12 }}>
+                    <Text style={{ color: formAiSummary ? '#334155' : '#94A3B8', fontSize: 14 }}>
+                      {formAiSummary || "해결된 요청의 AI 요약 정보가 이곳에 표시됩니다."}
+                    </Text>
                   </View>
-                </>
-              ) : null}
+                </View>
+              </View>
             </ScrollView>
 
             <TouchableOpacity
@@ -1304,10 +1426,6 @@ export const LocationManager = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
   container: {
     flex: 1,
     paddingHorizontal: 20,
@@ -1430,7 +1548,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
     marginBottom: 16,
     zIndex: 10,
   },
@@ -1493,7 +1610,7 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 12,
+    marginLeft: 6,
   },
   filterRight: {
     flexDirection: "row",
@@ -1619,6 +1736,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderRadius: 20,
     width: "100%",
+    maxHeight: "90%",
     padding: 24,
     elevation: 5,
     shadowColor: "#000",

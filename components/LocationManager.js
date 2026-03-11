@@ -11,7 +11,7 @@ import {
   Switch,
   Alert,
 } from "react-native";
-import { MapPin, Plus, X, Send, User, Clock, DollarSign, AlertCircle, FileText, ChevronDown, ChevronUp, Edit2, Trash2 } from "lucide-react-native";
+import { MapPin, Plus, X, Send, User, Clock, DollarSign, AlertCircle, FileText, ChevronDown, ChevronUp, Edit2, Trash2, Search } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const WAITING_STATUSES = [
@@ -27,7 +27,7 @@ const WAITING_STATUS_ALIASES = {
   "섭외지답변 대기중": "섭외지 답변 대기중",
 };
 const STATUS_OPTIONS = ["확정", ...WAITING_STATUSES, "보류", "취소"];
-const FILTER_TABS = ["전체", "요청중", "확정", "보류/취소"];
+const FILTER_TABS = ["전체", "진행 중", "확정", "취소"];
 const CONFLICT_STATUSES = new Set(["요청중", "확정", ...WAITING_STATUSES]);
 
 const normalizeStatus = (status) => {
@@ -136,6 +136,7 @@ const normalizeRequestThreads = (requests = []) => {
 };
 
 export const LocationManager = ({
+  project,
   locations,
   setLocations,
   currentUserName = "",
@@ -152,10 +153,11 @@ export const LocationManager = ({
   const [editingLoc, setEditingLoc] = useState(null);
 
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [riskOnly, setRiskOnly] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState("전체");
-  const [requestWaitingFilter, setRequestWaitingFilter] = useState("전체");
-  const [requestWaitingExpanded, setRequestWaitingExpanded] = useState(false);
+  const [statusExpanded, setStatusExpanded] = useState(false);
+  const [dateFilter, setDateFilter] = useState("전체");
+  const [dateExpanded, setDateExpanded] = useState(false);
 
   const [formDate, setFormDate] = useState("");
   const [formName, setFormName] = useState("");
@@ -184,6 +186,38 @@ export const LocationManager = ({
     setNewRequestAuthor((prev) => prev || currentUserName || "");
   }, [currentUserName]);
 
+  const dateOptions = useMemo(() => {
+    if (!project?.startDate) return [{ label: "전체", value: "전체" }];
+
+    const start = new Date(project.startDate);
+    const days = project.totalDays || 1;
+
+    let options = [];
+    if (days > 1) {
+      options.push({ label: "전체", value: "전체" });
+    }
+
+    let current = new Date(start);
+    for (let i = 0; i < days; i++) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+
+      options.push({
+        label: `${i + 1}일차 (${mm}/${dd})`,
+        value: `${yyyy}-${mm}-${dd}`
+      });
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Automatically set default dateFilter to the exact date if it's a 1-day project and currently set to '전체'
+    if (days === 1 && dateFilter === "전체") {
+      setTimeout(() => setDateFilter(options[0].value), 0);
+    }
+
+    return options;
+  }, [project]);
+
   const conflictIds = useMemo(() => {
     const active = locations.filter(
       (item) =>
@@ -208,7 +242,7 @@ export const LocationManager = ({
   }, [locations]);
 
   const filteredLocations = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase();
+    const keyword = searchVisible ? searchKeyword.trim().toLowerCase() : "";
     return locations
       .filter((loc) => {
         if (!keyword) return true;
@@ -216,22 +250,22 @@ export const LocationManager = ({
         const manager = String(loc.manager || "").toLowerCase();
         return name.includes(keyword) || manager.includes(keyword);
       })
-      .filter((loc) => (riskOnly ? Boolean(loc.risk) : true))
       .filter((loc) => {
         const normalized = normalizeStatus(loc.status);
         if (statusFilter === "전체") return true;
-        if (statusFilter === "요청중") {
-          if (requestWaitingFilter === "전체") {
-            return normalized === "요청중" || isWaitingStatus(normalized);
-          }
-          return normalized === requestWaitingFilter;
+        if (statusFilter === "진행 중") {
+          return normalized === "요청중" || isWaitingStatus(normalized) || normalized === "보류";
         }
-        if (statusFilter === "보류/취소") {
-          return normalized === "보류" || normalized === "취소";
+        if (statusFilter === "취소") {
+          return normalized === "취소";
         }
         return normalized === statusFilter;
+      })
+      .filter((loc) => {
+        if (dateFilter === "전체") return true;
+        return loc.date === dateFilter;
       });
-  }, [locations, riskOnly, searchKeyword, statusFilter, requestWaitingFilter]);
+  }, [locations, searchKeyword, searchVisible, statusFilter, dateFilter]);
 
   const resetForm = () => {
     setEditingLoc(null);
@@ -576,109 +610,111 @@ export const LocationManager = ({
     if (status === "보류") return { bg: "#FEF3C7", text: "#92400E" };
     return { bg: "#EEF2FF", text: "#4F46E5" };
   };
-  const requestWaitingOptions =
-    requestWaitingFilter === "전체"
-      ? WAITING_STATUSES
-      : ["전체", ...WAITING_STATUSES];
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-        <Plus size={20} color="#FFF" />
-        <Text style={styles.addButtonText}>장소 섭외 요청</Text>
-      </TouchableOpacity>
+      <View style={styles.filterBar}>
+        <View style={styles.filterDropdowns}>
+          {/* Status Dropdown */}
+          <View style={{ zIndex: 10, flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.dropdownTitle}>진행상태별</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setStatusExpanded(!statusExpanded);
+                setDateExpanded(false);
+              }}
+            >
+              <Text style={styles.dropdownButtonText}>{statusFilter}</Text>
+              <ChevronDown size={16} color="#475569" />
+            </TouchableOpacity>
+            {statusExpanded && (
+              <View style={[styles.dropdownMenu, { top: 44, left: 66 }]}>
+                {FILTER_TABS.map(status => (
+                  <TouchableOpacity
+                    key={status}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setStatusFilter(status);
+                      setStatusExpanded(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownItemText,
+                      statusFilter === status && styles.dropdownItemTextActive
+                    ]}>{status}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
-      <TextInput
-        style={styles.searchInput}
-        value={searchKeyword}
-        onChangeText={setSearchKeyword}
-        placeholder="장소명/담당자 검색"
-        placeholderTextColor="#9CA3AF"
-      />
-
-      <ScrollView
-        horizontal
-        style={styles.filterScroll}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {FILTER_TABS.map((status) => (
+          {/* Date Dropdown */}
+          <View style={{ zIndex: 9, marginLeft: 16, flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.dropdownTitle}>일자별</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setDateExpanded(!dateExpanded);
+                setStatusExpanded(false);
+              }}
+            >
+              <Text style={styles.dropdownButtonText}>
+                {dateOptions.find(opt => opt.value === dateFilter)?.label || "선택"}
+              </Text>
+              <ChevronDown size={16} color="#475569" />
+            </TouchableOpacity>
+            {dateExpanded && (
+              <ScrollView style={[styles.dropdownMenu, { maxHeight: 200, top: 44, left: 50 }]} nestedScrollEnabled={true}>
+                {dateOptions.map(opt => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setDateFilter(opt.value);
+                      setDateExpanded(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownItemText,
+                      dateFilter === opt.value && styles.dropdownItemTextActive
+                    ]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+        <View style={styles.filterRight}>
+          {/* Search Icon */}
           <TouchableOpacity
-            key={status}
-            style={[
-              styles.filterChip,
-              statusFilter === status && styles.filterChipActive,
-            ]}
+            style={styles.searchIconButton}
             onPress={() => {
-              setStatusFilter(status);
-              if (status !== "요청중") {
-                setRequestWaitingFilter("전체");
-                setRequestWaitingExpanded(false);
-              }
+              setSearchVisible(!searchVisible);
+              setStatusExpanded(false);
+              setDateExpanded(false);
+              if (searchVisible) setSearchKeyword(""); // Clear on hide
             }}
           >
-            <Text
-              numberOfLines={1}
-              allowFontScaling={false}
-              style={[
-                styles.filterChipText,
-                statusFilter === status && styles.filterChipTextActive,
-              ]}
-            >
-              {status}
-            </Text>
+            <Search size={20} color={searchVisible ? "#4F46E5" : "#64748B"} />
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>리스크만 보기</Text>
-        <Switch value={riskOnly} onValueChange={setRiskOnly} />
-      </View>
-
-      {statusFilter === "요청중" ? (
-        <View style={styles.requestWaitingBox}>
-          <TouchableOpacity
-            style={styles.requestWaitingHeader}
-            activeOpacity={0.8}
-            onPress={() => setRequestWaitingExpanded((prev) => !prev)}
-          >
-            <Text style={styles.toggleLabel}>답변 대기 필터</Text>
-            <Text style={styles.requestWaitingValue}>
-              {requestWaitingFilter} {requestWaitingExpanded ? "▲" : "▼"}
-            </Text>
-          </TouchableOpacity>
-
-          {requestWaitingExpanded ? (
-            <View style={styles.requestWaitingOptions}>
-              {requestWaitingOptions.map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={[
-                    styles.requestWaitingOption,
-                    requestWaitingFilter === status &&
-                    styles.requestWaitingOptionActive,
-                  ]}
-                  onPress={() => {
-                    setRequestWaitingFilter(status);
-                    setRequestWaitingExpanded(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.requestWaitingOptionText,
-                      requestWaitingFilter === status &&
-                      styles.requestWaitingOptionTextActive,
-                    ]}
-                  >
-                    {status}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
         </View>
-      ) : null}
+      </View>
+      {/* Search Input Section */}
+      {
+        searchVisible && (
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInputActive}
+              value={searchKeyword}
+              onChangeText={setSearchKeyword}
+              placeholder="섭외지 관련 내용 검색"
+              placeholderTextColor="#9CA3AF"
+              autoFocus
+            />
+          </View>
+        )
+      }
 
       <ScrollView
         style={styles.cardList}
@@ -759,6 +795,13 @@ export const LocationManager = ({
           );
         })}
       </ScrollView>
+      {/* 새 장소 섭외 작성 플로팅 버튼 */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={openAddModal}
+      >
+        <Plus size={24} color="#FFF" />
+      </TouchableOpacity>
 
       <Modal visible={detailVisible} transparent={true} animationType="fade">
         <View style={styles.detailOverlay}>
@@ -1256,7 +1299,7 @@ export const LocationManager = ({
           </View>
         </View>
       </Modal>
-    </View>
+    </View >
   );
 };
 
@@ -1265,21 +1308,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  addButton: {
-    flexDirection: "row",
-    backgroundColor: "#4F46E5",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  addButtonText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 15,
-    marginLeft: 8,
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   searchInput: {
     borderWidth: 1,
@@ -1395,6 +1426,102 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 120,
   },
+  filterBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    zIndex: 10,
+  },
+  filterDropdowns: {
+    flexDirection: "row",
+  },
+  dropdownTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#3B82F6",
+    marginRight: 6,
+  },
+  dropdownButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 80,
+    justifyContent: "space-between",
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: 64,
+    left: 0,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    minWidth: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#475569",
+  },
+  dropdownItemTextActive: {
+    color: "#4F46E5",
+    fontWeight: "700",
+  },
+  searchIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  filterRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  countText: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  countNumber: {
+    color: "#4F46E5",
+    fontWeight: "700",
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  searchInputActive: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#4F46E5",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#1E293B",
+  },
   locCardHorizontal: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -1464,6 +1591,22 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: "700",
+  },
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 120, // 바텀 탭 네비게이션과 겹치지 않게 조절
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#4F46E5",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
   modalOverlay: {
     flex: 1,

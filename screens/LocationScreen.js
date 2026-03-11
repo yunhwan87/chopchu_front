@@ -335,12 +335,6 @@ export const LocationScreen = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.description}>
-          현재 프로젝트의 장소 리스트입니다. 신규 요청 작성 및 조회가
-          가능합니다.
-        </Text>
-      </View>
 
       {loading && uiLocations.length === 0 ? (
         <ActivityIndicator size="large" color="#4F46E5" style={{ marginVertical: 20 }} />
@@ -348,6 +342,7 @@ export const LocationScreen = ({
       {error ? <Text style={styles.errorText}>DB 오류: {error}</Text> : null}
 
       <LocationManager
+        project={project}
         locations={project?.id ? uiLocations : locations}
         setLocations={setLocations}
         schedule={schedule}

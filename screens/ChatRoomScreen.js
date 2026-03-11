@@ -10,6 +10,7 @@ import { fetchMessages, sendMessage } from '../src/api/chat';
 import { useAuth } from '../src/hooks/useAuth';
 import { supabase } from '../src/lib/supabase';
 import { summarizeChatByDate } from '../src/services/summarizeService';
+import { toKoreanErrorMessage } from '../src/utils/errorMessages';
 
 // 캘린더 한국어 화
 LocaleConfig.locales['ko'] = {
@@ -121,7 +122,7 @@ export const ChatRoomScreen = ({ room, project, onBack }) => {
                             const summary = await summarizeChatByDate(room.id, searchDate);
                             alert(`[${searchDate} 요약 결과]\n\n${summary}`);
                         } catch (error) {
-                            alert(error.message);
+                            alert(toKoreanErrorMessage(error, "요약을 불러오는 중 문제가 발생했어요."));
                         } finally {
                             setSummarizing(false);
                         }

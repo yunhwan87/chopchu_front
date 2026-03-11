@@ -39,7 +39,7 @@ export const getLocationDetails = async (locationId) => {
  */
 export const createLocation = async (locationData, pucs = []) => {
     const user = (await supabase.auth.getUser()).data.user;
-    if (!user) throw new Error('User not authenticated');
+    if (!user) throw new Error('로그인이 필요해요. 다시 로그인해 주세요.');
 
     const { data: location, error: locationError } = await supabase
         .from('locations')

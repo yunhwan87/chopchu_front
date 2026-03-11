@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { fetchMessages } from '../api/chat';
 import { getLocations, updateLocation } from '../api/locations';
+import { toKoreanErrorMessage } from '../utils/errorMessages';
 
 export const setGeminiApiKey = (key) => {
     // Deprecated: API Key is now securely managed by Supabase Edge Functions
@@ -40,7 +41,7 @@ ${conversationText}
         return data.text;
     } catch (error) {
         console.error("채팅 요약 실패:", error);
-        throw new Error("요약 중 오류가 발생했습니다: " + error.message);
+        throw new Error(toKoreanErrorMessage(error, "요약 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."));
     }
 };
 
@@ -117,7 +118,7 @@ ${conversationText}
         return data.text;
     } catch (error) {
         console.error("날짜별 채팅 요약 실패:", error);
-        throw new Error("요약 중 오류가 발생했습니다: " + error.message);
+        throw new Error(toKoreanErrorMessage(error, "요약 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."));
     }
 };
 
@@ -217,6 +218,6 @@ ${conversationText}
 
     } catch (error) {
         console.error("요청 요약 및 업데이트 실패:", error);
-        throw new Error("처리 중 오류가 발생했습니다: " + error.message);
+        throw new Error(toKoreanErrorMessage(error, "처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."));
     }
 };

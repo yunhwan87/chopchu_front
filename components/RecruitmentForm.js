@@ -13,6 +13,7 @@ import {
 import { X, Plus, Trash2, User, Phone, Mail } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRecruitments } from '../src/hooks/useRecruitments';
+import { toKoreanErrorMessage } from '../src/utils/errorMessages';
 
 export const RecruitmentForm = ({ projectId, onClose, onSuccess }) => {
     const { addRecruitment, loading } = useRecruitments(projectId);
@@ -77,7 +78,7 @@ export const RecruitmentForm = ({ projectId, onClose, onSuccess }) => {
             Alert.alert('성공', '섭외지가 성공적으로 등록되었습니다.');
             onSuccess();
         } else {
-            Alert.alert('오류', result.error);
+            Alert.alert('오류', toKoreanErrorMessage(result.error, '섭외지 등록 중 문제가 발생했어요.'));
         }
     };
 

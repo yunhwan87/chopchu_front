@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { MapPin, Plus, X, Send, User, Clock, DollarSign, AlertCircle, FileText, ChevronDown, ChevronUp, Edit2, Trash2, Search } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 const WAITING_STATUSES = [
   "코디 답변대기중",
@@ -377,7 +378,7 @@ export const LocationManager = ({
             } catch (error) {
               Alert.alert(
                 "삭제 실패",
-                error?.message || "장소 삭제에 실패했습니다.",
+                toKoreanErrorMessage(error, "장소 삭제에 실패했어요."),
               );
             } finally {
               setIsSaving(false);
@@ -539,7 +540,7 @@ export const LocationManager = ({
         }
         setModalVisible(false);
       } catch (error) {
-        Alert.alert("저장 실패", error?.message || "장소 수정에 실패했습니다.");
+        Alert.alert("저장 실패", toKoreanErrorMessage(error, "장소 수정에 실패했어요."));
       } finally {
         setIsSaving(false);
       }
@@ -585,7 +586,7 @@ export const LocationManager = ({
         }
         setModalVisible(false);
       } catch (error) {
-        Alert.alert("저장 실패", error?.message || "장소 생성에 실패했습니다.");
+        Alert.alert("저장 실패", toKoreanErrorMessage(error, "장소 생성에 실패했어요."));
       } finally {
         setIsSaving(false);
       }

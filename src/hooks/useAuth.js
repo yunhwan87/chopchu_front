@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { authService } from '../services/authService';
 import { getUserProfile, updateUserProfile } from '../api/profiles';
+import { toKoreanErrorMessage } from '../utils/errorMessages';
 
 export const useAuth = () => {
     const [user, setUser] = useState(null);
@@ -72,24 +73,24 @@ export const useAuth = () => {
     };
 
     const updateProfile = async (updates) => {
-        if (!user) return { success: false, error: "No user logged in" };
+        if (!user) return { success: false, error: "로그인이 필요해요. 다시 로그인해 주세요." };
         try {
             const data = await updateUserProfile(user.id, updates);
             setProfile(data);
             return { success: true, data };
         } catch (error) {
-            return { success: false, error: error.message };
+            return { success: false, error: toKoreanErrorMessage(error, '프로필을 수정하지 못했어요.') };
         }
     };
 
     const updatePassword = async (newPassword) => {
-        if (!user) return { success: false, error: "No user logged in" };
+        if (!user) return { success: false, error: "로그인이 필요해요. 다시 로그인해 주세요." };
         try {
             const { error } = await supabase.auth.updateUser({ password: newPassword });
             if (error) throw error;
             return { success: true };
         } catch (error) {
-            return { success: false, error: error.message };
+            return { success: false, error: toKoreanErrorMessage(error, '비밀번호를 변경하지 못했어요.') };
         }
     };
 

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import * as locationApi from '../api/locations';
+import { toKoreanErrorMessage } from '../utils/errorMessages';
 
 export const useLocations = (projectId) => {
     const [locations, setLocations] = useState([]);
@@ -14,7 +15,7 @@ export const useLocations = (projectId) => {
             const data = await locationApi.getLocations(projectId);
             setLocations(data);
         } catch (err) {
-            setError(err.message);
+            setError(toKoreanErrorMessage(err, '장소 목록을 불러오지 못했어요.'));
         } finally {
             setLoading(false);
         }
@@ -31,8 +32,9 @@ export const useLocations = (projectId) => {
             setLocations(prev => [newLocation, ...prev]);
             return { success: true, data: newLocation };
         } catch (err) {
-            setError(err.message);
-            return { success: false, error: err.message };
+            const message = toKoreanErrorMessage(err, '장소를 등록하지 못했어요.');
+            setError(message);
+            return { success: false, error: message };
         } finally {
             setLoading(false);
         }
@@ -46,8 +48,9 @@ export const useLocations = (projectId) => {
             setLocations(prev => prev.map(l => l.id === locationId ? updated : l));
             return { success: true, data: updated };
         } catch (err) {
-            setError(err.message);
-            return { success: false, error: err.message };
+            const message = toKoreanErrorMessage(err, '장소를 수정하지 못했어요.');
+            setError(message);
+            return { success: false, error: message };
         } finally {
             setLoading(false);
         }
@@ -61,8 +64,9 @@ export const useLocations = (projectId) => {
             setLocations(prev => prev.filter(l => l.id !== locationId));
             return { success: true };
         } catch (err) {
-            setError(err.message);
-            return { success: false, error: err.message };
+            const message = toKoreanErrorMessage(err, '장소를 삭제하지 못했어요.');
+            setError(message);
+            return { success: false, error: message };
         } finally {
             setLoading(false);
         }

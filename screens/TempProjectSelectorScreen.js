@@ -5,6 +5,7 @@ import { Plus, Folder, LogOut } from 'lucide-react-native';
 import { useAuth } from '../src/hooks/useAuth';
 import { searchUsers } from '../src/api/profiles';
 import { UserPlus, X, Search } from 'lucide-react-native';
+import { toKoreanErrorMessage } from '../src/utils/errorMessages';
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -78,7 +79,7 @@ export const TempProjectSelectorScreen = ({ onSelectProject }) => {
             resetForm();
             Alert.alert('성공', '새 프로젝트가 생성되었습니다.');
         } else {
-            Alert.alert('오류', result.error);
+            Alert.alert('오류', toKoreanErrorMessage(result.error, '프로젝트 생성 중 문제가 발생했어요.'));
         }
     };
 

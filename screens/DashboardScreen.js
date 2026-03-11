@@ -22,6 +22,7 @@ import { useRequests } from "../src/hooks/useRequests";
 import { CommunicationLog } from "../components/CommunicationLog";
 import { searchUsers } from "../src/api/profiles";
 import { Search, UserPlus } from "lucide-react-native";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 export const DashboardScreen = (props) => {
   const { projects = [], schedule, setActiveTab, setExpandedProjId, onSelectProject, currentProject, addProject, projectsLoading } = props;
@@ -158,7 +159,7 @@ export const DashboardScreen = (props) => {
         setStartDate(new Date());
         setEndDate(new Date());
       } else {
-        Alert.alert("저장 실패", result.error || "프로젝트를 생성할 수 없습니다.");
+        Alert.alert("저장 실패", toKoreanErrorMessage(result.error, "프로젝트를 생성할 수 없어요."));
       }
     } catch (error) {
       Alert.alert("에러", "시스템 오류가 발생했습니다.");

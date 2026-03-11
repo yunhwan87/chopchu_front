@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Modal, TextInput,
 import { Edit2, X, Trash2 } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, schedule = [], expandedProjId, setExpandedProjId }) => {
   const scrollViewRef = useRef(null);
@@ -122,7 +123,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
               if (result.success) {
                 if (expandedProjId === projId) setExpandedProjId(null);
               } else {
-                Alert.alert("삭제 실패", result.error || "문제가 발생했습니다.");
+                Alert.alert("삭제 실패", toKoreanErrorMessage(result.error, "프로젝트 삭제 중 문제가 발생했어요."));
               }
             } else {
               setProjects(projects.filter(p => p.id !== projId));

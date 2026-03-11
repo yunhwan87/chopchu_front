@@ -9,11 +9,13 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    Alert,
 } from "react-native";
 import { X, User } from "lucide-react-native";
 import { useAuth } from "../src/hooks/useAuth";
 import { useRequests } from "../src/hooks/useRequests";
 import { supabase } from "../src/lib/supabase";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 export const NewRequestModal = ({ visible, onClose, project, onCreated }) => {
     const { user } = useAuth();
@@ -78,7 +80,7 @@ export const NewRequestModal = ({ visible, onClose, project, onCreated }) => {
             onCreated();
             onClose();
         } else {
-            alert("요청 생성에 실패했습니다.");
+            Alert.alert("오류", toKoreanErrorMessage(error, "요청 생성에 실패했어요."));
         }
     };
 

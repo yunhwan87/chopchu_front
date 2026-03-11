@@ -27,6 +27,7 @@ import { LocationScreen } from "./screens/LocationScreen";
 import { CommunicationScreen } from "./screens/CommunicationScreen";
 import { AuthScreen } from "./screens/AuthScreen";
 import { ChatMainScreen } from "./screens/ChatMainScreen";
+import { MyProfile } from "./components/MyProfile";
 
 // 중앙 관리형 데이터 (기존 유지)
 const MOCK_DATA = {
@@ -219,7 +220,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
     });
   }, [apiProjects]);
 
-  const { logout } = useAuth();
+  const { logout, profile, user, updateProfile, updatePassword } = useAuth();
   const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
   const [menuVisible, setMenuVisible] = useState(false);
   const [isTabBarVisible, setIsTabBarVisible] = useState(true);
@@ -262,6 +263,17 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
         return <CommunicationScreen project={currentProject} />;
       case "Chat":
         return <ChatMainScreen project={currentProject} onSetTabBarVisibility={setIsTabBarVisible} />;
+      case "MyProfile":
+        return (
+          <MyProfile
+            profile={profile}
+            user={user}
+            onLogout={onLogout}
+            onBack={() => setActiveTab("Dashboard")}
+            updateProfile={updateProfile}
+            updatePassword={updatePassword}
+          />
+        );
       default:
         return null;
     }
@@ -271,24 +283,25 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 헤더 (OnSync 고정) */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.brandTitle}>OnSync</Text>
-          <Text style={styles.headerSubtitle}>
-            {currentProject ? currentProject.title : "프로젝트 대시보드"}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      {/* 헤더 (OnSync 고정) - 프로필 화면에서는 숨김 */}
+      {activeTab !== "MyProfile" && (
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.brandTitle}>OnSync</Text>
+            <Text style={styles.headerSubtitle}>
+              {currentProject ? currentProject.title : "프로젝트 대시보드"}
+            </Text>
+          </View>
           <TouchableOpacity
             style={styles.profileCircle}
-            onPress={() => setMenuVisible(true)}
+            onPress={() => setActiveTab("MyProfile")}
           >
-            <Text style={styles.profileText}>{currentUserName || "김제작"}</Text>
+            <Text style={styles.profileText}>
+              {user?.email === "1@1" ? "김" : (profile?.nickname || user?.user_metadata?.nickname || currentUserName || "U")[0]}
+            </Text>
           </TouchableOpacity>
         </View>
-      </View>
-
+      )}
 
       <View style={{ flex: 1 }}>{renderContent()}</View>
 
@@ -364,7 +377,7 @@ const TabItem = ({ icon, label, active, onPress }) => (
 
 export default function App() {
 
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [currentProject, setCurrentProject] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
@@ -392,6 +405,7 @@ export default function App() {
           currentUserName={user?.email || "사용자"}
           onBackToProjects={() => setCurrentProject(null)}
           onSelectProject={setCurrentProject}
+          onLogout={logout}
         />
       )}
     </SafeAreaProvider>

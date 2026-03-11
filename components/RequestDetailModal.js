@@ -16,6 +16,7 @@ import { User, X, Send, ChevronDown } from "lucide-react-native";
 import { useAuth } from "../src/hooks/useAuth";
 import { useRequests } from "../src/hooks/useRequests";
 import { summarizeRequestToLocation } from "../src/services/summarizeService";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 const STATUS_OPTIONS = [
     { value: "pending", label: "요청 확인 대기 중", bg: "#FFF7ED", text: "#EA580C" },
@@ -48,10 +49,12 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh,
     }, [visible, request]);
 
     const handleAutoInProgress = async () => {
-        const { data } = await changeStatus(request.id, 'in_progress');
-        if (!data?.error) {
+        const { data, error } = await changeStatus(request.id, 'in_progress');
+        if (!error && !data?.error) {
             setCurrentStatus('in_progress');
             if (onRefresh) onRefresh();
+        } else if (error) {
+            Alert.alert("오류", toKoreanErrorMessage(error, "상태 변경에 실패했어요."));
         }
     }
 
@@ -65,19 +68,23 @@ export const RequestDetailModal = ({ visible, onClose, request, type, onRefresh,
     const handleSendReply = async () => {
         if (!replyText.trim()) return;
 
-        const { data } = await replyToRequest(request.id, user.id, replyText.trim());
-        if (data) {
+        const { data, error } = await replyToRequest(request.id, user.id, replyText.trim());
+        if (data && !error) {
             setMessages([...messages, data]);
             setReplyText("");
+        } else if (error) {
+            Alert.alert("오류", toKoreanErrorMessage(error, "답변 전송에 실패했어요."));
         }
     };
 
     const handleStatusChange = async (newStatusValue) => {
-        const { data } = await changeStatus(request.id, newStatusValue);
-        if (!data?.error) {
+        const { data, error } = await changeStatus(request.id, newStatusValue);
+        if (!error && !data?.error) {
             setCurrentStatus(newStatusValue);
             setShowStatusMenu(false);
             // 부모 컴포넌트의 리스트 갱신은 useRequests 훅 안에서 낙관적 업데이트됨
+        } else if (error) {
+            Alert.alert("오류", toKoreanErrorMessage(error, "상태 변경에 실패했어요."));
         }
     };
 

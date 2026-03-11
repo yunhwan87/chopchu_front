@@ -27,7 +27,7 @@ export const getProjects = async () => {
  */
 export const createProject = async ({ title, startDate, endDate, totalDays, note, memberIds = [] }) => {
     const user = (await supabase.auth.getUser()).data.user;
-    if (!user) throw new Error('User not authenticated');
+    if (!user) throw new Error('로그인이 필요해요. 다시 로그인해 주세요.');
 
     // 1. 프로젝트 생성
     const { data: project, error: projectError } = await supabase

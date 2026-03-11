@@ -13,6 +13,7 @@ import {
 import { X, Plus, Trash2, User, Phone, Mail } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocations } from '../src/hooks/useLocations';
+import { toKoreanErrorMessage } from '../src/utils/errorMessages';
 
 export const LocationForm = ({ projectId, onClose, onSuccess }) => {
     const { addLocation, loading } = useLocations(projectId);
@@ -77,7 +78,7 @@ export const LocationForm = ({ projectId, onClose, onSuccess }) => {
             Alert.alert('성공', '장소가 성공적으로 등록되었습니다.');
             onSuccess();
         } else {
-            Alert.alert('오류', result.error);
+            Alert.alert('오류', toKoreanErrorMessage(result.error, '장소 등록 중 문제가 발생했어요.'));
         }
     };
 

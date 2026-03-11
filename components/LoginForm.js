@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { useAuth } from "../src/hooks/useAuth";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 export const LoginForm = ({ onLogin }) => {
     const [isLogin, setIsLogin] = useState(true);
@@ -58,7 +59,7 @@ export const LoginForm = ({ onLogin }) => {
                 setIsLogin(true);
             }
         } else {
-            Alert.alert("오류", result.error);
+            Alert.alert("오류", toKoreanErrorMessage(result.error, "로그인 또는 회원가입 중 문제가 발생했어요."));
         }
     };
 

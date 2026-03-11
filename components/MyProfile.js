@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Camera, Plus, Check, X } from "lucide-react-native";
 import { TextInput, Alert } from "react-native";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 export const MyProfile = ({ profile, user, onLogout, onBack, updateProfile, updatePassword }) => {
   const [editingField, setEditingField] = React.useState(null); // 'password', 'nickname', 'phone'
@@ -56,10 +57,10 @@ export const MyProfile = ({ profile, user, onLogout, onBack, updateProfile, upda
         setEditingField(null);
         setEditValue("");
       } else {
-        Alert.alert("오류", errorMsg || "수정에 실패했습니다.");
+        Alert.alert("오류", toKoreanErrorMessage(errorMsg, "수정에 실패했어요."));
       }
     } catch (err) {
-      Alert.alert("오류", "예기치 못한 오류가 발생했습니다.");
+      Alert.alert("오류", toKoreanErrorMessage(err, "예기치 못한 오류가 발생했어요."));
     }
   };
 

@@ -4,6 +4,7 @@ import { LocationManager } from "../components/LocationManager";
 import { useLocations } from "../src/hooks/useLocations";
 import { useAuth } from "../src/hooks/useAuth";
 import { supabase } from "../src/lib/supabase";
+import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 export const LocationScreen = ({
   project,
@@ -295,7 +296,7 @@ export const LocationScreen = ({
       const payload = mapUiLocationToDbPayload(uiItem);
       const result = await addLocation(payload, buildPocsFromUi(uiItem));
       if (!result.success) {
-        throw new Error(result.error || "장소 생성에 실패했습니다.");
+        throw new Error(toKoreanErrorMessage(result.error, "장소 생성에 실패했어요."));
       }
       await syncLocationThreadsToRequests(
         result.data?.id,
@@ -315,7 +316,7 @@ export const LocationScreen = ({
         buildPocsFromUi(uiItem),
       );
       if (!result.success) {
-        throw new Error(result.error || "장소 수정에 실패했습니다.");
+        throw new Error(toKoreanErrorMessage(result.error, "장소 수정에 실패했어요."));
       }
       await syncLocationThreadsToRequests(locationId, uiItem.requests || []);
       return mapDbLocationToUi(result.data);
@@ -327,7 +328,7 @@ export const LocationScreen = ({
     async (locationId) => {
       const result = await removeLocation(locationId);
       if (!result.success) {
-        throw new Error(result.error || "장소 삭제에 실패했습니다.");
+        throw new Error(toKoreanErrorMessage(result.error, "장소 삭제에 실패했어요."));
       }
     },
     [removeLocation],
@@ -339,7 +340,7 @@ export const LocationScreen = ({
       {loading && uiLocations.length === 0 ? (
         <ActivityIndicator size="large" color="#4F46E5" style={{ marginVertical: 20 }} />
       ) : null}
-      {error ? <Text style={styles.errorText}>DB 오류: {error}</Text> : null}
+      {error ? <Text style={styles.errorText}>오류: {toKoreanErrorMessage(error, "장소 데이터를 불러오지 못했어요.")}</Text> : null}
 
       <LocationManager
         project={project}

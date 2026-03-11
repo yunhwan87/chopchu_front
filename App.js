@@ -27,7 +27,7 @@ import { LocationScreen } from "./screens/LocationScreen";
 import { CommunicationScreen } from "./screens/CommunicationScreen";
 import { AuthScreen } from "./screens/AuthScreen";
 import { ChatMainScreen } from "./screens/ChatMainScreen";
-import { MyProfile } from "./components/MyProfile";
+import { ProfileScreen } from "./screens/ProfileScreen";
 
 // 중앙 관리형 데이터 (기존 유지)
 const MOCK_DATA = {
@@ -195,7 +195,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
   const [locations, setLocations] = useState(MOCK_DATA.locations);
 
   // API 프로젝트 데이터 가져오기
-  const { projects: apiProjects, loading: projectsLoading, fetchProjects, addProject } = useProjects();
+  const { projects: apiProjects, loading: projectsLoading, fetchProjects, addProject, deleteProject } = useProjects();
   const [projects, setProjects] = useState(MOCK_DATA.projects);
 
   useEffect(() => {
@@ -250,6 +250,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
           <ScheduleScreen
             projects={unifiedProjects}
             setProjects={setProjects}
+            deleteProject={deleteProject}
             schedule={schedule}
             expandedProjId={expandedProjId}
             setExpandedProjId={setExpandedProjId}
@@ -265,7 +266,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
         return <ChatMainScreen project={currentProject} onSetTabBarVisibility={setIsTabBarVisible} />;
       case "MyProfile":
         return (
-          <MyProfile
+          <ProfileScreen
             profile={profile}
             user={user}
             onLogout={onLogout}

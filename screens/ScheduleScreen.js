@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, Platform, Alert } from "react-native";
-import { Edit2, X } from "lucide-react-native";
+import { Edit2, X, Trash2 } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
 
-export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expandedProjId, setExpandedProjId }) => {
+export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, schedule = [], expandedProjId, setExpandedProjId }) => {
   const scrollViewRef = useRef(null);
   const [cardLayouts, setCardLayouts] = useState({});
   const [dayFilter, setDayFilter] = useState("전체");
@@ -107,6 +107,33 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
     setEditModalVisible(false);
   };
 
+  const handleDelete = (projId) => {
+    Alert.alert(
+      "프로젝트 삭제",
+      "삭제하시면 되돌릴 수 없습니다.",
+      [
+        { text: "취소", style: "cancel" },
+        { 
+          text: "삭제", 
+          style: "destructive", 
+          onPress: async () => {
+            if (deleteProject) {
+              const result = await deleteProject(projId);
+              if (result.success) {
+                if (expandedProjId === projId) setExpandedProjId(null);
+              } else {
+                Alert.alert("삭제 실패", result.error || "문제가 발생했습니다.");
+              }
+            } else {
+              setProjects(projects.filter(p => p.id !== projId));
+              if (expandedProjId === projId) setExpandedProjId(null);
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   // 선택된 프로젝트가 있으면 해당 프로젝트만 표시, 없으면 전체 표시
   const displayedProjects = expandedProjId
     ? projects.filter(p => p.id === expandedProjId)
@@ -146,9 +173,14 @@ export const ScheduleScreen = ({ projects = [], setProjects, schedule = [], expa
                   <View style={{ flex: 1 }}>
                     <Text style={styles.detailTitle}>{proj.title}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => openEditModal(proj)} style={styles.editBtn}>
-                    <Edit2 size={18} color="#64748B" />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity onPress={() => openEditModal(proj)} style={styles.editBtn}>
+                      <Edit2 size={18} color="#64748B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(proj.id)} style={[styles.editBtn, styles.deleteBtn]}>
+                      <Trash2 size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={styles.detailSubTextRow}>
@@ -491,6 +523,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+  },
+  deleteBtn: {
+    borderColor: "#FEE2E2",
+    backgroundColor: "#FEF2F2",
   },
   modalOverlay: {
     flex: 1,

@@ -40,15 +40,26 @@ export const DashboardScreen = (props) => {
 
   // 사용자 검색 로직 (0.5초 디바운싱)
   useEffect(() => {
+    if (!memberQuery.trim()) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
     const timer = setTimeout(async () => {
-      if (memberQuery.length >= 2) {
+      if (memberQuery.length >= 1) {
         setSearching(true);
         try {
           const results = await searchUsers(memberQuery);
-          // 이미 선택된 멤버는 검색 결과에서 제외
-          setSearchResults(results.filter(r => !selectedMembers.some(sm => sm.id === r.id)));
+          // 1. 이미 선택된 멤버 제외
+          // 2. 현재 로그인한 본인 제외 (작성자는 자동 포함되므로)
+          setSearchResults(results.filter(r => 
+            !selectedMembers.some(sm => sm.id === r.id) && 
+            r.id !== user?.id
+          ));
         } catch (err) {
           console.error('Search error:', err);
+          setSearchResults([]);
         } finally {
           setSearching(false);
         }
@@ -57,7 +68,7 @@ export const DashboardScreen = (props) => {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [memberQuery, selectedMembers]);
+  }, [memberQuery, selectedMembers, user?.id]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -296,30 +307,41 @@ export const DashboardScreen = (props) => {
               </View>
 
               {/* 검색 결과 리스트 */}
-              {searchResults.length > 0 && (
-                <View style={styles.searchResultsContainer}>
-                  {searchResults.map((u) => (
-                    <TouchableOpacity
-                      key={u.id}
-                      style={styles.searchItem}
-                      onPress={() => {
-                        setSelectedMembers([...selectedMembers, u]);
-                        setMemberQuery("");
-                        setSearchResults([]);
-                      }}
-                    >
-                      <View style={styles.avatarMini}>
-                        <Text style={styles.avatarTextMini}>{u.nickname?.[0] || "U"}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.searchItemName}>{u.nickname || "Unknown"}</Text>
-                        <Text style={styles.searchItemEmail}>{u.email}</Text>
-                      </View>
-                      <UserPlus size={18} color="#4F46E5" />
-                    </TouchableOpacity>
-                  ))}
+              {searching ? (
+                <View style={styles.searchingStatus}>
+                  <ActivityIndicator size="small" color="#4F46E5" />
+                  <Text style={styles.searchingText}>사용자 찾는 중...</Text>
                 </View>
-              )}
+              ) : memberQuery.length >= 1 ? (
+                searchResults.length > 0 ? (
+                  <View style={styles.searchResultsContainer}>
+                    {searchResults.map((u) => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={styles.searchItem}
+                        onPress={() => {
+                          setSelectedMembers([...selectedMembers, u]);
+                          setMemberQuery("");
+                          setSearchResults([]);
+                        }}
+                      >
+                        <View style={styles.avatarMini}>
+                          <Text style={styles.avatarTextMini}>{u.nickname?.[0] || "U"}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.searchItemName}>{u.nickname || "Unknown"}</Text>
+                          <Text style={styles.searchItemEmail}>{u.email}</Text>
+                        </View>
+                        <UserPlus size={18} color="#4F46E5" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptySearchContainer}>
+                    <Text style={styles.emptySearchText}>검색 결과가 없습니다.</Text>
+                  </View>
+                )
+              ) : null}
 
               {/* 선택된 멤버 태그Cloud */}
               {selectedMembers.length > 0 && (
@@ -637,7 +659,28 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   saveButtonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-
+  searchingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    gap: 8,
+  },
+  searchingText: {
+    color: '#64748B',
+    fontSize: 14,
+  },
+  emptySearchContainer: {
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  emptySearchText: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
   // 신규 스타일 - 세로형 리스트로 수정
   recentProjectsVerticalList: {
     paddingHorizontal: 20,

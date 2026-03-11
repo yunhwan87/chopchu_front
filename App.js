@@ -227,38 +227,61 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
   const [schedule, setSchedule] = useState([]); // MOCK_DATA.schedule 대신 빈 배열로 시작
 
   // 프로젝트 변경 시 확정된 장소 기반으로 일정 자동 로드
+  const syncScheduleFromLocations = async () => {
+    if (!currentProject?.id) {
+      setSchedule(MOCK_DATA.schedule); // 프로젝트 없으면 일단 Mock (필요시)
+      return;
+    }
+
+    try {
+      const dbLocs = await locationApi.getLocations(currentProject.id);
+      const allLocsAsSchedule = dbLocs.map(l => {
+        let uiStatus = "진행 중";
+        if (l.status === 'confirmed') uiStatus = "확정";
+        else if (l.status === 'hold') uiStatus = "보류";
+        else if (l.status === 'canceled') uiStatus = "취소";
+
+        return {
+          id: l.id,
+          locationId: l.id,
+          time: l.shooting_time || "시간 미정",
+          location: l.title,
+          status: uiStatus,
+          type: "촬영",
+          date: l.location_date,
+          note: l.note
+        };
+      });
+
+      setSchedule(allLocsAsSchedule);
+    } catch (err) {
+      console.error("Error loading schedule from locations:", err);
+    }
+  };
+
   useEffect(() => {
-    const syncScheduleFromLocations = async () => {
-      if (!currentProject?.id) {
-        setSchedule(MOCK_DATA.schedule); // 프로젝트 없으면 일단 Mock (필요시)
-        return;
-      }
-
-      try {
-        const dbLocs = await locationApi.getLocations(currentProject.id);
-        const confirmedLocsAsSchedule = dbLocs
-          .filter(l => l.status === 'confirmed')
-          .map(l => ({
-            id: l.id,
-            locationId: l.id,
-            time: l.shooting_time || "시간 미정",
-            location: l.title,
-            status: "확정",
-            type: "촬영",
-            date: l.location_date
-          }));
-
-        // Mock 데이터 중 현재 프로젝트 날짜 범위에 있는 것들을 합쳐주거나
-        // 일단 DB 데이터 기반으로만 보여주고 싶으면 filter
-        // 여기선 명확한 Persistence를 위해 DB 데이터를 우선으로 합니다.
-        setSchedule(confirmedLocsAsSchedule);
-      } catch (err) {
-        console.error("Error loading schedule from locations:", err);
-      }
-    };
-
     syncScheduleFromLocations();
   }, [currentProject?.id]);
+
+  /**
+   * 새 일정(확정 장소) 추가
+   */
+  const addScheduleItem = async (payload) => {
+    if (!currentProject?.id) return { success: false, error: '선택된 프로젝트가 없습니다.' };
+
+    try {
+      await locationApi.createLocation({
+        ...payload,
+        project_id: currentProject.id,
+      });
+      // 저장 후 목록 갱신
+      await syncScheduleFromLocations();
+      return { success: true };
+    } catch (err) {
+      console.error('Error adding schedule item:', err);
+      return { success: false, error: err.message };
+    }
+  };
   const [menuVisible, setMenuVisible] = useState(false);
   const [isTabBarVisible, setIsTabBarVisible] = useState(true);
 
@@ -291,6 +314,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             schedule={schedule}
             expandedProjId={expandedProjId}
             setExpandedProjId={setExpandedProjId}
+            addScheduleItem={addScheduleItem}
           />
         );
       case "Location":

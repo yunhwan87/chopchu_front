@@ -135,21 +135,7 @@ export const DashboardScreen = (props) => {
       const result = await addProject(projectData);
 
       if (result.success) {
-        // 로컬 MOCK 데이터와 싱크를 맞추고 싶다면 남겨두지만, 
-        // 실제로는 apiProjects가 hook 내부에서 업데이트되므로 자동 갱신됩니다.
-        if (props.setProjects && props.projects) {
-          const newMockProject = {
-            id: result.data.id,
-            title: projectName,
-            members: membersStr,
-            totalDays,
-            startDate: formatDate(startDate),
-            endDate: formatDate(endDate),
-            note,
-          };
-          props.setProjects([...props.projects, newMockProject]);
-        }
-
+        // 성공 시 폼 초기화 및 모달 닫기
         setModalVisible(false);
         setProjectName("");
         setSelectedMembers([]);

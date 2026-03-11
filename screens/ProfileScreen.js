@@ -7,12 +7,7 @@ export const ProfileScreen = ({ profile, user, onLogout, onBack, updateProfile, 
         <View style={styles.container}>
             {/* Profile Header */}
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.brandTitle}>OnSync</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {profile?.nickname || user?.user_metadata?.nickname || "미설정"}
-                    </Text>
-                </View>
+                <Text style={styles.brandTitle}>OnSync</Text>
                 <View style={styles.headerButtons}>
                     <TouchableOpacity style={styles.headerBtn} onPress={onBack}>
                         <Text style={styles.headerBtnText}>

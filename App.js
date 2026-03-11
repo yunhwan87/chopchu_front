@@ -29,6 +29,9 @@ import { AuthScreen } from "./screens/AuthScreen";
 import { ChatMainScreen } from "./screens/ChatMainScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 
+// 추가: Persistence를 위한 API 임포트
+import * as locationApi from './src/api/locations';
+
 // 중앙 관리형 데이터 (기존 유지)
 const MOCK_DATA = {
   projects: [
@@ -221,7 +224,41 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
   }, [apiProjects]);
 
   const { logout, profile, user, updateProfile, updatePassword } = useAuth();
-  const [schedule, setSchedule] = useState(MOCK_DATA.schedule);
+  const [schedule, setSchedule] = useState([]); // MOCK_DATA.schedule 대신 빈 배열로 시작
+  
+  // 프로젝트 변경 시 확정된 장소 기반으로 일정 자동 로드
+  useEffect(() => {
+    const syncScheduleFromLocations = async () => {
+      if (!currentProject?.id) {
+        setSchedule(MOCK_DATA.schedule); // 프로젝트 없으면 일단 Mock (필요시)
+        return;
+      }
+
+      try {
+        const dbLocs = await locationApi.getLocations(currentProject.id);
+        const confirmedLocsAsSchedule = dbLocs
+          .filter(l => l.status === 'confirmed')
+          .map(l => ({
+            id: l.id,
+            locationId: l.id,
+            time: l.shooting_time || "시간 미정",
+            location: l.title,
+            status: "확정",
+            type: "촬영",
+            date: l.location_date
+          }));
+
+        // Mock 데이터 중 현재 프로젝트 날짜 범위에 있는 것들을 합쳐주거나
+        // 일단 DB 데이터 기반으로만 보여주고 싶으면 filter
+        // 여기선 명확한 Persistence를 위해 DB 데이터를 우선으로 합니다.
+        setSchedule(confirmedLocsAsSchedule);
+      } catch (err) {
+        console.error("Error loading schedule from locations:", err);
+      }
+    };
+
+    syncScheduleFromLocations();
+  }, [currentProject?.id]);
   const [menuVisible, setMenuVisible] = useState(false);
   const [isTabBarVisible, setIsTabBarVisible] = useState(true);
 
@@ -287,12 +324,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
       {/* 헤더 (OnSync 고정) - 프로필 화면에서는 숨김 */}
       {activeTab !== "MyProfile" && (
         <View style={styles.header}>
-          <View>
-            <Text style={styles.brandTitle}>OnSync</Text>
-            <Text style={styles.headerSubtitle}>
-              {currentProject ? currentProject.title : "프로젝트 대시보드"}
-            </Text>
-          </View>
+          <Text style={styles.brandTitle}>OnSync</Text>
           <TouchableOpacity
             style={styles.profileCircle}
             onPress={() => setActiveTab("MyProfile")}

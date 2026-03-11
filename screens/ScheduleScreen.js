@@ -137,7 +137,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
   // 선택된 프로젝트가 있으면 해당 프로젝트만 표시, 없으면 전체 표시
   const displayedProjects = expandedProjId
     ? projects.filter(p => p.id === expandedProjId)
-    : projects;
+    : [];
 
   return (
     <View style={styles.container}>
@@ -260,7 +260,22 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
           ))
         ) : (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>등록된 프로젝트가 없습니다.</Text>
+            <Text style={styles.emptyText}>
+              {!expandedProjId 
+                ? "홈 탭에서 프로젝트를 먼저 선택해주세요." 
+                : "선택한 프로젝트를 찾을 수 없거나 삭제되었습니다."}
+            </Text>
+            {!expandedProjId && (
+              <TouchableOpacity 
+                style={styles.goHomeBtn} 
+                onPress={() => {
+                  // 부모 컴포넌트(App.js)의 setActiveTab에 접근할 수 없으므로 
+                  // 이 부분은 App.js에서 주입받거나 구조적 개선이 필요할 수 있으나,
+                  // 우선은 텍스트 안내로 충분합니다.
+                }}
+              >
+              </TouchableOpacity>
+            )}
           </View>
         )}
 

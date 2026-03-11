@@ -1,14 +1,20 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, Platform, Alert } from "react-native";
-import { Edit2, X, Trash2 } from "lucide-react-native";
+import { Edit2, X, Trash2, ChevronDown, Plus, MapPin, AlertCircle, Calendar, Clock, ClipboardList, Search } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
 import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
-export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, schedule = [], expandedProjId, setExpandedProjId }) => {
+
+export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, schedule = [], expandedProjId, setExpandedProjId, addScheduleItem }) => {
   const scrollViewRef = useRef(null);
   const [cardLayouts, setCardLayouts] = useState({});
-  const [dayFilter, setDayFilter] = useState("전체");
+  const [statusFilter, setStatusFilter] = useState("전체");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [dateFilter, setDateFilter] = useState("전체");
+  const [showDayDropdown, setShowDayDropdown] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
 
   useEffect(() => {
     if (expandedProjId && cardLayouts[expandedProjId] !== undefined) {
@@ -19,8 +25,35 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
   }, [expandedProjId, cardLayouts]);
 
   useEffect(() => {
-    setDayFilter("전체");
+    setStatusFilter("전체");
+    setDateFilter("전체");
+    setSearchKeyword("");
+    setSearchVisible(false);
   }, [expandedProjId]);
+
+  const dateOptions = useMemo(() => {
+    const proj = projects.find(p => p.id === expandedProjId);
+    if (!proj || !proj.startDate) return [{ label: "전체", value: "전체" }];
+
+    const start = new Date(proj.startDate);
+    const days = proj.totalDays || 1;
+
+    let options = [{ label: "전체", value: "전체" }];
+
+    let current = new Date(start);
+    for (let i = 0; i < days; i++) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+
+      options.push({
+        label: `${i + 1}일차 (${mm}/${dd})`,
+        value: `${yyyy}-${mm}-${dd}`
+      });
+      current.setDate(current.getDate() + 1);
+    }
+    return options;
+  }, [expandedProjId, projects]);
 
   const getDDay = (startDateStr) => {
     if (!startDateStr) return "";
@@ -35,6 +68,17 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
     if (diffDays > 0) return `D-${diffDays}`;
     return `D+${Math.abs(diffDays)}`;
   };
+
+  const [addSchedModalVisible, setAddSchedModalVisible] = useState(false);
+  const [schedTitle, setSchedTitle] = useState("");
+  const [schedDate, setSchedDate] = useState(new Date());
+  const [schedStartTime, setSchedStartTime] = useState("09:00");
+  const [schedEndTime, setSchedEndTime] = useState("11:00");
+  const [schedNote, setSchedNote] = useState("");
+  const [schedStatus, setSchedStatus] = useState("확정");
+  const [showSchedDatePicker, setShowSchedDatePicker] = useState(false);
+  const [dayExpanded, setDayExpanded] = useState(false);
+  const [statusExpanded, setStatusExpanded] = useState(false);
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -108,6 +152,46 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
     setEditModalVisible(false);
   };
 
+  const handleAddSchedule = async () => {
+    if (!schedTitle.trim()) {
+      Alert.alert("알림", "일정 제목을 입력해주세요.");
+      return;
+    }
+
+    const mapStatusToDb = (st) => {
+      if (st === "확정") return "confirmed";
+      if (st === "취소") return "hold";
+      return "requested"; // 진행 중
+    };
+
+    const payload = {
+      title: schedTitle,
+      status: mapStatusToDb(schedStatus),
+      shooting_time: `${schedStartTime} ~ ${schedEndTime}`,
+      location_date: formatDate(schedDate),
+      note: schedNote,
+    };
+
+    if (addScheduleItem) {
+      const result = await addScheduleItem(payload);
+      if (result.success) {
+        setAddSchedModalVisible(false);
+        // 필드 초기화
+        setSchedTitle("");
+        setSchedNote("");
+        setSchedStartTime("09:00");
+        setSchedEndTime("11:00");
+        setSchedDate(new Date());
+        setSchedStatus("확정");
+      } else {
+        Alert.alert("저장 실패", toKoreanErrorMessage(result.error, "일정을 추가하는 중 문제가 발생했습니다."));
+      }
+    } else {
+      // Prop이 없는 경우 fallback (UI 데모용)
+      setAddSchedModalVisible(false);
+    }
+  };
+
   const handleDelete = (projId) => {
     Alert.alert(
       "프로젝트 삭제",
@@ -142,7 +226,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>프로젝트 상세 일정 리스트</Text>
+      <Text style={styles.headerTitle}>프로젝트 상세 일정</Text>
 
       <ScrollView
         ref={scrollViewRef}
@@ -214,41 +298,124 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
               {expandedProjId === proj.id && (
                 <View style={styles.timelineWrapper}>
                   <View style={[styles.sectionHeader, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
-                    <Text style={styles.sectionTitle}>촬영 일정 보드</Text>
+                    <Text style={styles.sectionTitle}>{proj.title} 촬영 일정</Text>
                     <View style={styles.dDayBadge}>
                       <Text style={styles.dDayText}>{getDDay(proj.startDate)}</Text>
                     </View>
                   </View>
 
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 15, paddingBottom: 5 }}>
-                    {["전체", ...Array.from({ length: proj.totalDays }, (_, i) => `${i + 1}일차`)].map(day => (
+                  <View style={styles.filterBar}>
+                    <View style={styles.filterDropdowns}>
+                      {/* Status Dropdown */}
+                      <View style={{ zIndex: 10, flexDirection: "row", alignItems: "center" }}>
+                        <Text style={styles.dropdownTitle}>진행상태별</Text>
+                        <TouchableOpacity
+                          style={styles.dropdownButton}
+                          onPress={() => {
+                            setShowStatusDropdown(!showStatusDropdown);
+                            setShowDayDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownButtonText}>{statusFilter}</Text>
+                          <ChevronDown size={14} color="#64748B" />
+                        </TouchableOpacity>
+                        {showStatusDropdown && (
+                          <View style={[styles.dropdownMenu, { top: 40, left: 66 }]}>
+                            {["전체", "진행 중", "확정", "보류", "취소"].map(st => (
+                              <TouchableOpacity
+                                key={st}
+                                style={styles.dropdownItem}
+                                onPress={() => { setStatusFilter(st); setShowStatusDropdown(false); }}
+                              >
+                                <Text style={[styles.dropdownItemText, statusFilter === st && styles.dropdownItemTextActive]}>{st}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Date Dropdown */}
+                      <View style={{ zIndex: 9, marginLeft: 10, flexDirection: "row", alignItems: "center" }}>
+                        <Text style={styles.dropdownTitle}>일자별</Text>
+                        <TouchableOpacity
+                          style={styles.dropdownButton}
+                          onPress={() => {
+                            setShowDayDropdown(!showDayDropdown);
+                            setShowStatusDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownButtonText}>
+                            {dateOptions.find(opt => opt.value === dateFilter)?.label || "선택"}
+                          </Text>
+                          <ChevronDown size={14} color="#64748B" />
+                        </TouchableOpacity>
+                        {showDayDropdown && (
+                          <ScrollView style={[styles.dropdownMenu, { maxHeight: 200, top: 40, left: 50 }]} nestedScrollEnabled={true}>
+                            {dateOptions.map(opt => (
+                              <TouchableOpacity
+                                key={opt.value}
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                  setDateFilter(opt.value);
+                                  setShowDayDropdown(false);
+                                }}
+                              >
+                                <Text style={[
+                                  styles.dropdownItemText,
+                                  dateFilter === opt.value && styles.dropdownItemTextActive
+                                ]}>{opt.label}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={styles.filterRight}>
                       <TouchableOpacity
-                        key={day}
-                        style={[styles.filterTab, dayFilter === day && styles.filterTabActive]}
-                        onPress={() => setDayFilter(day)}
+                        style={styles.searchIconButton}
+                        onPress={() => {
+                          setSearchVisible(!searchVisible);
+                          if (searchVisible) setSearchKeyword("");
+                        }}
                       >
-                        <Text style={[styles.filterTabText, dayFilter === day && styles.filterTabTextActive]}>{day}</Text>
+                        <Search size={18} color={searchVisible ? "#4F46E5" : "#64748B"} />
                       </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                    </View>
+                  </View>
+
+                  {searchVisible && (
+                    <View style={styles.searchContainer}>
+                      <TextInput
+                        style={styles.searchInputActive}
+                        value={searchKeyword}
+                        onChangeText={setSearchKeyword}
+                        placeholder="일정 내용 검색"
+                        placeholderTextColor="#9CA3AF"
+                        autoFocus
+                      />
+                    </View>
+                  )}
 
                   <ScheduleBoard
                     schedule={schedule.filter(item => {
                       if (!item.date || !proj.startDate || !proj.endDate) return false;
-                      const itemDate = new Date(item.date);
+
+                      const itemDateObj = new Date(item.date);
                       const sDate = new Date(proj.startDate);
                       const eDate = new Date(proj.endDate);
-                      let isInRange = itemDate >= sDate && itemDate <= eDate;
+                      const isInRange = itemDateObj >= sDate && itemDateObj <= eDate;
+                      if (!isInRange) return false;
 
-                      if (isInRange && dayFilter !== "전체") {
-                        const dayNum = parseInt(dayFilter.replace("일차", ""));
-                        const targetDate = new Date(sDate);
-                        targetDate.setDate(targetDate.getDate() + (dayNum - 1));
-                        if (formatDate(itemDate) !== formatDate(targetDate)) {
-                          isInRange = false;
-                        }
+                      if (statusFilter !== "전체" && item.status !== statusFilter) return false;
+                      if (dateFilter !== "전체" && item.date !== dateFilter) return false;
+
+                      if (searchKeyword.trim()) {
+                        const kw = searchKeyword.toLowerCase();
+                        return (item.location || "").toLowerCase().includes(kw) || (item.note || "").toLowerCase().includes(kw);
                       }
-                      return isInRange;
+
+                      return true;
                     }).sort((a, b) => new Date(a.date + 'T' + a.time.split(' ~ ')[0]) - new Date(b.date + 'T' + b.time.split(' ~ ')[0]))}
                     projectStartDate={proj.startDate}
                   />
@@ -278,6 +445,20 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
         )}
 
       </ScrollView>
+
+      {/* 우측 하단 추가 버튼 (FAB) */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => {
+          if (!expandedProjId) {
+            Alert.alert("알림", "일정을 추가하려면 먼저 프로젝트를 선택해주세요.");
+            return;
+          }
+          setAddSchedModalVisible(true);
+        }}
+      >
+        <Plus size={24} color="#FFF" />
+      </TouchableOpacity>
 
       {/* 수정 모달 */}
       <Modal visible={editModalVisible} animationType="slide" transparent={true}>
@@ -368,6 +549,237 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Text style={styles.saveButtonText}>저장</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 새 일정 추가 모달 (중앙 팝업 방식) */}
+      <Modal visible={addSchedModalVisible} animationType="fade" transparent={true}>
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>새 일정 추가</Text>
+              <TouchableOpacity onPress={() => setAddSchedModalVisible(false)}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              <View style={[styles.premiumDetailCard, { padding: 16 }]}>
+                {/* 0. 소속 프로젝트 정보 (Readonly) */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>소속 프로젝트</Text>
+                  </View>
+                  <Text style={[styles.premiumValue, { color: "#64748B", flex: 1, textAlign: 'right' }]} numberOfLines={1}>
+                    {projects.find(p => p.id === expandedProjId)?.title || "선택된 프로젝트 없음"}
+                  </Text>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 1. 일정 제목 */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <MapPin size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>일정 제목</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
+                    value={schedTitle}
+                    onChangeText={setSchedTitle}
+                    placeholder="예: 에펠탑 촬영/점심 식사"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 3. 날짜 설정 (일차 선택 시 자동 연동되지만 직접 수정도 가능) */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>날짜</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowSchedDatePicker(true)}>
+                    <Text style={styles.premiumValue}>{formatDate(schedDate)}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {showSchedDatePicker && (
+                  <View style={{ padding: 10 }}>
+                    <DateTimePicker
+                      value={schedDate}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "spinner" : "default"}
+                      onChange={(event, selectedDate) => {
+                        if (Platform.OS === "android") setShowSchedDatePicker(false);
+                        if (selectedDate) setSchedDate(selectedDate);
+                      }}
+                    />
+                    {Platform.OS === "ios" && (
+                      <TouchableOpacity
+                        onPress={() => setShowSchedDatePicker(false)}
+                        style={{ padding: 10, alignItems: "center", backgroundColor: "#EEF2FF", borderRadius: 8 }}
+                      >
+                        <Text style={{ color: "#4F46E5", fontWeight: "700" }}>완료</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 0-1. 일차 선택 (Day Dropdown) */}
+                <View style={[styles.premiumRow, { zIndex: 110 }]}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>일차 선택</Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity
+                      style={[styles.dropdownButton, { minWidth: 100, height: 32, paddingVertical: 0 }]}
+                      onPress={() => {
+                        setDayExpanded(!dayExpanded);
+                      }}
+                    >
+                      <Text style={styles.dropdownButtonText}>
+                        {(() => {
+                          const p = projects.find(proj => proj.id === expandedProjId);
+                          if (!p?.startDate) return "1일차";
+                          return `${Math.floor((schedDate - new Date(p.startDate)) / (1000 * 60 * 60 * 24)) + 1}일차`;
+                        })()}
+                      </Text>
+                      <ChevronDown size={14} color="#64748B" />
+                    </TouchableOpacity>
+                    {dayExpanded && (
+                      <View style={[styles.dropdownMenu, { top: 35, right: 0, minWidth: 100, maxHeight: 150 }]}>
+                        <ScrollView nestedScrollEnabled={true}>
+                          {Array.from({ length: projects.find(p => p.id === expandedProjId)?.totalDays || 1 }, (_, i) => (
+                            <TouchableOpacity
+                              key={i}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                const p = projects.find(proj => proj.id === expandedProjId);
+                                if (p?.startDate) {
+                                  const newDate = new Date(p.startDate);
+                                  newDate.setDate(newDate.getDate() + i);
+                                  setSchedDate(newDate);
+                                }
+                                setDayExpanded(false);
+                              }}
+                            >
+                              <Text style={styles.dropdownItemText}>{i + 1}일차</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+
+
+
+
+                {/* 4. 시간 설정 */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Clock size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>진행 시간</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TextInput
+                      style={[styles.premiumValue, styles.timeInputSmall]}
+                      value={schedStartTime}
+                      onChangeText={setSchedStartTime}
+                      placeholder="09:00"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                    <Text style={{ marginHorizontal: 4, color: '#64748B' }}>~</Text>
+                    <TextInput
+                      style={[styles.premiumValue, styles.timeInputSmall]}
+                      value={schedEndTime}
+                      onChangeText={setSchedEndTime}
+                      placeholder="11:00"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 4-1. 섭외 상태 */}
+                <View style={[styles.premiumRow, { zIndex: 100 }]}>
+                  <View style={styles.premiumLabelGroup}>
+                    <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>섭외 상태</Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity
+                      style={[styles.dropdownButton, { minWidth: 100, height: 32, paddingVertical: 0 }]}
+                      onPress={() => {
+                        setStatusExpanded(!statusExpanded);
+                        setDayExpanded(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownButtonText}>{schedStatus}</Text>
+                      <ChevronDown size={14} color="#64748B" />
+                    </TouchableOpacity>
+                    {statusExpanded && (
+                      <View style={[styles.dropdownMenu, { top: 35, right: 0, minWidth: 100 }]}>
+                        {["진행 중", "확정", "취소"].map(st => (
+                          <TouchableOpacity
+                            key={st}
+                            style={styles.dropdownItem}
+                            onPress={() => { setSchedStatus(st); setStatusExpanded(false); }}
+                          >
+                            <Text style={[styles.dropdownItemText, schedStatus === st && styles.dropdownItemTextActive]}>{st}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 5. 비고 */}
+                <View style={{ paddingVertical: 12 }}>
+                  <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
+                    <ClipboardList size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>메모 사항</Text>
+                  </View>
+                  <View style={styles.premiumMemoContainer}>
+                    <TextInput
+                      style={styles.premiumMemoInput}
+                      value={schedNote}
+                      onChangeText={setSchedNote}
+                      placeholder="세부 내용을 입력하세요..."
+                      multiline={true}
+                    />
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setAddSchedModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveButton, { flex: 1, marginTop: 0, marginBottom: 0 }]}
+                onPress={handleAddSchedule}
+              >
+                <Text style={styles.saveButtonText}>저장</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -504,23 +916,101 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 13,
   },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F1F5F9",
-    marginRight: 8,
+  filterBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    zIndex: 10,
   },
-  filterTabActive: {
-    backgroundColor: "#4F46E5",
+  filterDropdowns: {
+    flexDirection: "row",
   },
-  filterTabText: {
-    color: "#64748B",
+  dropdownTitle: {
+    fontSize: 12,
     fontWeight: "700",
-    fontSize: 13,
+    color: "#3B82F6",
+    marginRight: 6,
   },
-  filterTabTextActive: {
-    color: "#FFF",
+  dropdownButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 80,
+    justifyContent: "space-between",
+  },
+  dropdownButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    right: 0, // 컨테이너 기준으로 오른쪽에 위치
+    width: 120, // 메뉴 너비 고정 (내용이 잘리지 않도록 버튼보다 약간 넓게)
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    zIndex: 100,
+    maxHeight: 250,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: {
+    color: '#4F46E5',
+    fontWeight: '700',
+  },
+  filterRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  searchIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInputActive: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#4F46E5",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#1E293B",
   },
   emptyWrap: {
     marginTop: 40,
@@ -552,6 +1042,25 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     maxHeight: "90%",
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  popupContent: {
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    padding: 24,
+    width: "100%",
+    maxHeight: "80%",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
   },
   modalHeader: {
     flexDirection: "row",
@@ -603,4 +1112,77 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   saveButtonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#F1F5F9",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#64748B",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 120, // 바텀 탭 네비게이션과 겹치지 않게 조절
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#4F46E5",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  premiumDetailCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    marginBottom: 12,
+  },
+  premiumRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 52,
+    paddingHorizontal: 16,
+  },
+  premiumLabelGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  premiumIcon: { marginRight: 8 },
+  premiumLabel: { fontSize: 14, color: "#64748B", fontWeight: "600" },
+  premiumValue: { fontSize: 15, color: "#1E293B", fontWeight: "700" },
+  premiumSeparator: { height: 1, backgroundColor: "#F1F5F9" },
+  premiumMemoContainer: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    minHeight: 100,
+  },
+  premiumMemoInput: { fontSize: 14, color: "#475569", lineHeight: 22, textAlignVertical: 'top' },
+  timeInputSmall: {
+    width: 60,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    textAlign: 'center',
+    paddingVertical: 2,
+    fontSize: 14,
+  },
 });

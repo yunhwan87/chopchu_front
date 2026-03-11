@@ -57,12 +57,9 @@ export const ScheduleBoard = ({ schedule, projectStartDate }) => {
 
               return (
                 <View key={item.id || index} style={styles.timelineItem}>
+                  {/* 왼쪽 시간 표시 제거 (카드의 내용과 중복된다는 요청 반영) */}
                   <View style={styles.timelineLeft}>
-                    <View style={[styles.timeIndicator, isConfirmed && styles.timeIndicatorConfirmed]}>
-                      <Text style={[styles.timeLabel, isConfirmed && styles.timeLabelConfirmed]}>
-                        {item.time?.split(" ~ ")[0] || "미정"}
-                      </Text>
-                    </View>
+                    <View style={[styles.dot, isConfirmed && styles.dotConfirmed]} />
                     {index !== dayItems.length - 1 && (
                       <View style={styles.connector} />
                     )}
@@ -148,26 +145,22 @@ const styles = StyleSheet.create({
   timelineLeft: {
     alignItems: "center",
     marginRight: 12,
-    width: 65,
+    width: 20, // 폭 축소
   },
-  timeIndicator: {
-    backgroundColor: "#F1F5F9",
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 12,
   },
-  timeIndicatorConfirmed: {
-    backgroundColor: "#EEF2FF",
-  },
-  timeLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#64748B",
-  },
-  timeLabelConfirmed: {
-    color: "#4F46E5",
+  dotConfirmed: {
+    backgroundColor: "#4F46E5",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: "#EEF2FF",
   },
   connector: {
     width: 2,

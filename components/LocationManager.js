@@ -84,6 +84,13 @@ const isValidTimeRange = (startTime, endTime) => {
 const getSlotKey = (item) =>
   `${item.date || ""}-${item.startTime || ""}-${item.endTime || ""}`;
 
+const toDateOnly = (date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const normalizeRequestThreads = (requests = []) => {
   if (!Array.isArray(requests)) return [];
 
@@ -268,9 +275,24 @@ export const LocationManager = ({
       });
   }, [locations, searchKeyword, searchVisible, statusFilter, dateFilter]);
 
+  const getDefaultFormDate = () => {
+    if (dateFilter && dateFilter !== "전체") return dateFilter;
+
+    const projectStart = String(project?.startDate || "").trim();
+    if (projectStart) return projectStart;
+
+    return toDateOnly(new Date());
+  };
+
+  const toValidDateObj = (dateString) => {
+    const parsed = new Date(`${dateString}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
   const resetForm = () => {
+    const defaultDate = getDefaultFormDate();
     setEditingLoc(null);
-    setFormDate("");
+    setFormDate(defaultDate);
     setFormName("");
     setFormManager("");
     setFormStartTime("");
@@ -285,7 +307,7 @@ export const LocationManager = ({
     setNewRequestAuthor(currentUserName);
     setReplyDrafts({});
     setReplyAuthorDrafts({});
-    setDateObj(new Date());
+    setDateObj(toValidDateObj(defaultDate));
     setShowDatePicker(false);
     setTimeError("");
   };
@@ -465,6 +487,10 @@ export const LocationManager = ({
 
   const handleSave = async () => {
     if (!formName.trim()) return;
+    if (!formDate) {
+      Alert.alert("알림", "날짜를 선택해 주세요.");
+      return;
+    }
 
     const normalizedStartTime = normalizeTimeValue(formStartTime);
     const normalizedEndTime = normalizeTimeValue(formEndTime);

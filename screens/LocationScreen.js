@@ -162,11 +162,13 @@ export const LocationScreen = ({
       Array.isArray(item.locations_poc) && item.locations_poc.length > 0
         ? String(item.locations_poc[0]?.name || "").trim()
         : "";
+    const fallbackDate = String(project?.startDate || "").trim();
     const defaultRequests = parseContentToRequests(item.content, item.id);
 
     return {
       id: item.id,
-      date: item.location_date || "",
+      // Legacy rows may have empty location_date; fall back to project start date for visibility.
+      date: item.location_date || fallbackDate || "",
       name: item.title || "",
       manager: managerFromPoc,
       startTime,
@@ -178,7 +180,7 @@ export const LocationScreen = ({
       requests: defaultRequests,
       status: mapDbStatusToUiStatus(item.status, item.card_status),
     };
-  }, []);
+  }, [project?.startDate]);
 
   const uiLocations = useMemo(
     () => dbLocations.map((item) => mapDbLocationToUi(item)),

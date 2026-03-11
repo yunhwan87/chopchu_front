@@ -114,9 +114,9 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
       "삭제하시면 되돌릴 수 없습니다.",
       [
         { text: "취소", style: "cancel" },
-        { 
-          text: "삭제", 
-          style: "destructive", 
+        {
+          text: "삭제",
+          style: "destructive",
           onPress: async () => {
             if (deleteProject) {
               const result = await deleteProject(projId);
@@ -129,7 +129,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
               setProjects(projects.filter(p => p.id !== projId));
               if (expandedProjId === projId) setExpandedProjId(null);
             }
-          } 
+          }
         }
       ]
     );
@@ -163,11 +163,8 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  if (expandedProjId === proj.id) {
-                    setExpandedProjId(null); // 이미 열려있으면 닫기
-                  } else {
-                    setExpandedProjId(proj.id); // 아니면 열기
-                  }
+                  // 이미 선택된 상태에서는 접히지 않도록(null이 되지 않도록) 고정합니다.
+                  setExpandedProjId(proj.id);
                 }}
               >
                 <View style={styles.detailHeader}>
@@ -262,13 +259,13 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
         ) : (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>
-              {!expandedProjId 
-                ? "홈 탭에서 프로젝트를 먼저 선택해주세요." 
+              {!expandedProjId
+                ? "홈 탭에서 프로젝트를 먼저 선택해주세요."
                 : "선택한 프로젝트를 찾을 수 없거나 삭제되었습니다."}
             </Text>
             {!expandedProjId && (
-              <TouchableOpacity 
-                style={styles.goHomeBtn} 
+              <TouchableOpacity
+                style={styles.goHomeBtn}
                 onPress={() => {
                   // 부모 컴포넌트(App.js)의 setActiveTab에 접근할 수 없으므로 
                   // 이 부분은 App.js에서 주입받거나 구조적 개선이 필요할 수 있으나,

@@ -33,7 +33,7 @@ export const AuthScreen = ({ onLogin }) => {
                     useNativeDriver: true,
                 }),
                 Animated.timing(translateYAnim, {
-                    toValue: -height * 0.25, // 화면의 상단 25% 지점 정도로 이동
+                    toValue: -height * 0.32, // 더 높이 이동 (-0.25 -> -0.32)
                     duration: 800,
                     useNativeDriver: true,
                 }),
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     formContainer: {
         width: "100%",
         paddingHorizontal: 20,
-        marginTop: height * 0.1, // 폼이 조금 더 아래에 배치되게
+        marginTop: height * 0.2, // 폼을 더 아래로 밀기 (0.1 -> 0.2)
         zIndex: 20,
     },
     // 배경 디자인용 원

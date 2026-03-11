@@ -183,8 +183,8 @@ export const ChatRoomScreen = ({ room, project, onBack }) => {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 115 : 20}
         >
             {/* 커스텀 헤더 */}
             <View style={styles.header}>

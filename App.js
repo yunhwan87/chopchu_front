@@ -32,159 +32,7 @@ import { ProfileScreen } from "./screens/ProfileScreen";
 // 추가: Persistence를 위한 API 임포트
 import * as locationApi from './src/api/locations';
 
-// 중앙 관리형 데이터 (기존 유지)
-const MOCK_DATA = {
-  projects: [
-    {
-      id: 1,
-      title: "파리 패션위크 촬영",
-      members: "홍길동, 김제작",
-      totalDays: 3,
-      startDate: "2026-04-10",
-      endDate: "2026-04-12",
-      note: "주요 패션위크 촬영 건",
-      risks: 2,
-      pendingQuestions: 3,
-    },
-    {
-      id: 2,
-      title: "뉴욕 FW 캠페인",
-      members: "이촬영, 김제작",
-      totalDays: 5,
-      startDate: "2026-05-15",
-      endDate: "2026-05-19",
-      note: "브루클린 야외 로케이션 포함",
-      risks: 1,
-      pendingQuestions: 1,
-    },
-    {
-      id: 3,
-      title: "서울 상반기 화보",
-      members: "최조명, 박현장",
-      totalDays: 2,
-      startDate: "2026-06-01",
-      endDate: "2026-06-02",
-      note: "스튜디오 및 근교 야외 촬영",
-      risks: 0,
-      pendingQuestions: 5,
-    },
-    {
-      id: 4,
-      title: "도쿄 스트릿 룩북",
-      members: "홍길동",
-      totalDays: 4,
-      startDate: "2026-06-20",
-      endDate: "2026-06-23",
-      note: "거리 촬영 허가 건 확인 필요",
-      risks: 3,
-      pendingQuestions: 2,
-    },
-    {
-      id: 5,
-      title: "여름 리조트 컬렉션",
-      members: "김제작, 최조명, 강모델",
-      totalDays: 5,
-      startDate: "2026-07-10",
-      endDate: "2026-07-14",
-      note: "제주도 해변 로케이션",
-      risks: 0,
-      pendingQuestions: 0,
-    },
-    {
-      id: 6,
-      title: "가을/겨울 선공개",
-      members: "박현장",
-      totalDays: 1,
-      startDate: "2026-08-05",
-      endDate: "2026-08-05",
-      note: "실내 스튜디오",
-      risks: 1,
-      pendingQuestions: 1,
-    }
-  ],
-  schedule: [
-    {
-      id: 1,
-      time: "09:00",
-      location: "에펠탑 광장",
-      status: "확정",
-      type: "촬영",
-      date: "2026-04-10"
-    },
-    {
-      id: 2,
-      time: "13:00",
-      location: "루브르 박물관 내부",
-      status: "섭외 중",
-      type: "촬영",
-      date: "2026-04-10"
-    },
-    {
-      id: 3,
-      time: "15:30",
-      location: "센강 유람선",
-      status: "초안",
-      type: "이동/촬영",
-      date: "2026-04-11"
-    },
-    {
-      id: 4,
-      time: "18:00",
-      location: "개선문 디너 장소",
-      status: "확정",
-      type: "식사",
-      date: "2026-04-11"
-    },
-    {
-      id: 5,
-      time: "19:30",
-      location: "몽마르뜨 언덕",
-      status: "섭외 중",
-      type: "촬영",
-      date: "2026-04-12"
-    },
-    {
-      id: 6,
-      time: "21:00",
-      location: "호텔 세트장",
-      status: "확정",
-      type: "휴식",
-      date: "2026-04-12"
-    },
-    {
-      id: 7,
-      time: "10:00",
-      location: "베르사유 궁전",
-      status: "섭외 중",
-      type: "예비",
-      date: "2026-04-15" // 이 일정은 프로젝트 기간 밖으로 두어 필터링 테스트용으로 씀
-    }
-  ],
-  locations: [
-    { id: 1, name: "에펠탑 광장", status: "확정", cost: "€1,200", date: "2026-04-10" },
-    { id: 2, name: "루브르 박물관", status: "섭외 중", cost: "미정", date: "2026-04-10" },
-    { id: 3, name: "브루클린 다리", status: "요청중", cost: "$500", date: "2026-05-15" },
-    { id: 4, name: "강남 A 스튜디오", status: "확정", cost: "₩1,000,000", date: "2026-06-01" },
-    { id: 5, name: "제주 중문 해변", status: "확정", cost: "₩300,000", date: "2026-07-10" },
-    { id: 6, name: "시부야 교차로", status: "섭외 중", cost: "¥50,000", date: "2026-06-20" },
-    { id: 7, name: "센강 유람선", status: "요청중", cost: "미정", date: "2026-04-11" }
-  ],
-  questions: [
-    {
-      id: 1,
-      askedBy: "김제작",
-      question: "드론 촬영 허가증 나왔나요?",
-      status: "답변대기",
-    },
-    {
-      id: 2,
-      askedBy: "김제작",
-      question: "차량 예약 확인 부탁해요.",
-      status: "답변완료",
-      answer: "예약 완료되었습니다.",
-    },
-  ],
-};
+// 하드코딩된 MOCK_DATA 제거 완료
 
 
 import { useAuth } from "./src/hooks/useAuth";
@@ -195,11 +43,11 @@ import { useEffect, useMemo } from "react";
 function MainContent({ onLogout, currentProject, onBackToProjects, currentUserName, onSelectProject }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [locations, setLocations] = useState(MOCK_DATA.locations);
+  const [locations, setLocations] = useState([]);
 
   // API 프로젝트 데이터 가져오기
-  const { projects: apiProjects, loading: projectsLoading, fetchProjects, addProject, deleteProject } = useProjects();
-  const [projects, setProjects] = useState(MOCK_DATA.projects);
+  const { projects: apiProjects, loading: projectsLoading, fetchProjects, addProject, deleteProject, updateProject } = useProjects();
+  const [projects, setProjects] = useState([]);
 
   useEffect(() => {
     fetchProjects();
@@ -229,9 +77,12 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
   // 프로젝트 변경 시 확정된 장소 기반으로 일정 자동 로드
   const syncScheduleFromLocations = async () => {
     if (!currentProject?.id) {
-      setSchedule(MOCK_DATA.schedule); // 프로젝트 없으면 일단 Mock (필요시)
+      setSchedule([]); // 프로젝트 없으면 빈 배열
       return;
     }
+
+    // 새 프로젝트 데이터를 가져오기 전에 기존 데이터를 비웁니다 (플리커링 방지)
+    setSchedule([]);
 
     try {
       const dbLocs = await locationApi.getLocations(currentProject.id);
@@ -298,7 +149,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             setProjects={setProjects}
             addProject={addProject}
             projectsLoading={projectsLoading}
-            schedule={MOCK_DATA.schedule}
+            schedule={[]}
             currentProject={currentProject}
             setActiveTab={setActiveTab}
             setExpandedProjId={setExpandedProjId}
@@ -311,6 +162,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             projects={unifiedProjects}
             setProjects={setProjects}
             deleteProject={deleteProject}
+            updateProject={updateProject}
             schedule={schedule}
             expandedProjId={expandedProjId}
             setExpandedProjId={setExpandedProjId}

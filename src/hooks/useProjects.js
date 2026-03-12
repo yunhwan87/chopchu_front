@@ -49,6 +49,21 @@ export const useProjects = () => {
         }
     };
 
+    const updateProject = async (projectId, projectData) => {
+        setLoading(true);
+        try {
+            const updatedProject = await projectsApi.updateProject(projectId, projectData);
+            setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
+            return { success: true, data: updatedProject };
+        } catch (err) {
+            const message = toKoreanErrorMessage(err, '프로젝트를 수정하지 못했어요.');
+            setError(message);
+            return { success: false, error: message };
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return {
         projects,
         loading,
@@ -56,5 +71,6 @@ export const useProjects = () => {
         fetchProjects,
         addProject,
         deleteProject,
+        updateProject,
     };
 };

@@ -29,62 +29,69 @@ export const DashboardScreen = (props) => {
   const { user } = useAuth();
   const { requests: receivedRequests, loading: requestsLoading, loadRequests } = useRequests();
 
-  // 탭 이동 시 요청 목록 갱신 연동
+  // 1. 상태(State) 선언들이 가장 먼저 와야 함
+  const [modalVisible, setModalVisible] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [note, setNote] = useState("");
+  const [memberQuery, setMemberQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerType, setPickerType] = useState("start");
 
+  // 2. 부수 효과(useEffect) 및 함수 선언
   useEffect(() => {
     if (user?.id) {
-      // 프로젝트 관계없이 유저가 받은 모든 대기 요청을 로드
       loadRequests(null, user.id, 'received');
     }
   }, [user?.id, loadRequests]);
 
-  // 사용자 검색 로직 (0.5초 디바운싱)
   useEffect(() => {
-    if (!memberQuery.trim()) {
+    const currentQuery = memberQuery.trim();
+    if (currentQuery.length < 2) {
       setSearchResults([]);
       setSearching(false);
       return;
     }
 
     const timer = setTimeout(async () => {
-      if (memberQuery.length >= 1) {
-        setSearching(true);
-        try {
-          const results = await searchUsers(memberQuery);
-          // 1. 이미 선택된 멤버 제외
-          // 2. 현재 로그인한 본인 제외 (작성자는 자동 포함되므로)
-          setSearchResults(results.filter(r => 
-            !selectedMembers.some(sm => sm.id === r.id) && 
-            r.id !== user?.id
-          ));
-        } catch (err) {
-          console.error('Search error:', err);
-          setSearchResults([]);
-        } finally {
-          setSearching(false);
-        }
-      } else {
-        setSearchResults([]);
+      setSearching(true);
+      try {
+        console.log(`[Search] Requesting API for: "${currentQuery}"`);
+        const results = await searchUsers(currentQuery);
+        if (currentQuery !== memberQuery.trim()) return;
+
+        const filtered = results.filter(r => {
+          const isAlreadySelected = selectedMembers.some(sm => sm.id === r.id);
+          const isMe = r.id === user?.id;
+          return !isAlreadySelected && !isMe;
+        });
+
+        console.log(`[Search] Success! Found ${results.length} -> Filtered to ${filtered.length}`);
+        setSearchResults(filtered);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setSearching(false);
       }
     }, 500);
+
     return () => clearTimeout(timer);
   }, [memberQuery, selectedMembers, user?.id]);
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [note, setNote] = useState("");
-
-  // 멤버 검색 및 선택 상태
-  const [memberQuery, setMemberQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedMembers, setSelectedMembers] = useState([]);
-  const [searching, setSearching] = useState(false);
-
-  // Dates
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerType, setPickerType] = useState("start"); // "start" or "end"
+  const openAddModal = () => {
+    setProjectName("");
+    setNote("");
+    setMemberQuery("");
+    setSearchResults([]);
+    setSelectedMembers([]);
+    setStartDate(new Date());
+    setEndDate(new Date());
+    setModalVisible(true);
+  };
 
   const membersCount = selectedMembers.length;
 
@@ -173,7 +180,7 @@ export const DashboardScreen = (props) => {
           <Text style={styles.sectionTitle}>대기중인 요청</Text>
           <TouchableOpacity
             style={styles.addProjectBtn}
-            onPress={() => setModalVisible(true)}
+            onPress={openAddModal}
           >
             <Plus size={18} color="#FFF" />
             <Text style={styles.addProjectText}>프로젝트 추가</Text>
@@ -312,7 +319,7 @@ export const DashboardScreen = (props) => {
                   <ActivityIndicator size="small" color="#4F46E5" />
                   <Text style={styles.searchingText}>사용자 찾는 중...</Text>
                 </View>
-              ) : memberQuery.length >= 1 ? (
+              ) : memberQuery.length >= 2 ? (
                 searchResults.length > 0 ? (
                   <View style={styles.searchResultsContainer}>
                     {searchResults.map((u) => (

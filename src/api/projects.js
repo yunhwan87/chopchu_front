@@ -94,16 +94,77 @@ export const getProjectDetails = async (projectId) => {
 };
 
 /**
- * 프로젝트 삭제
+ * 프로젝트 삭제 (연관된 모든 데이터 순차 삭제)
  */
 export const deleteProject = async (projectId) => {
-    const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId);
+    try {
+        // 1. 연관된 데이터의 ID들을 먼저 수집
+        const [
+            { data: locations },
+            { data: rooms },
+            { data: requests },
+            { data: itineraries }
+        ] = await Promise.all([
+            supabase.from('locations').select('id').eq('project_id', projectId),
+            supabase.from('chat_rooms').select('id').eq('project_id', projectId),
+            supabase.from('requests').select('id').eq('project_id', projectId),
+            supabase.from('itinery').select('id').eq('project_id', projectId)
+        ]);
 
-    if (error) throw error;
-    return true;
+        const locationIds = locations?.map(l => l.id) || [];
+        const roomIds = rooms?.map(r => r.id) || [];
+        const requestIds = requests?.map(r => r.id) || [];
+        const itineraryIds = itineraries?.map(i => i.id) || [];
+
+        // 2. 최하위 자식 테이블 데이터 삭제 (Foreign Key 제약 조건 순서 고려)
+        
+        // 2-1. 일정 관련 하위 데이터
+        if (itineraryIds.length > 0) {
+            await supabase.from('itinery_locations').delete().in('itinery_id', itineraryIds);
+        }
+        
+        // 2-2. 장소 관련 하위 데이터
+        if (locationIds.length > 0) {
+            await Promise.all([
+                supabase.from('locations_poc').delete().in('location_id', locationIds),
+                supabase.from('itinery_locations').delete().in('location_id', locationIds)
+            ]);
+        }
+
+        // 2-3. 채팅 관련 하위 데이터
+        if (roomIds.length > 0) {
+            await Promise.all([
+                supabase.from('messages').delete().in('room_id', roomIds),
+                supabase.from('chat_room_members').delete().in('room_id', roomIds)
+            ]);
+        }
+
+        // 2-4. 요청 관련 하위 데이터
+        if (requestIds.length > 0) {
+            await supabase.from('request_messages').delete().in('request_id', requestIds);
+        }
+
+        // 3. 중간 부모 테이블 데이터 삭제
+        await Promise.all([
+            supabase.from('itinery').delete().eq('project_id', projectId),
+            supabase.from('locations').delete().eq('project_id', projectId),
+            supabase.from('chat_rooms').delete().eq('project_id', projectId),
+            supabase.from('requests').delete().eq('project_id', projectId),
+            supabase.from('project_members').delete().eq('project_id', projectId)
+        ]);
+
+        // 4. 최종 프로젝트 삭제
+        const { error } = await supabase
+            .from('projects')
+            .delete()
+            .eq('id', projectId);
+
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error('Error during project full deletion:', err);
+        throw err;
+    }
 };
 
 /**

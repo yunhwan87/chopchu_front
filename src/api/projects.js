@@ -105,3 +105,24 @@ export const deleteProject = async (projectId) => {
     if (error) throw error;
     return true;
 };
+
+/**
+ * 프로젝트 정보 수정
+ */
+export const updateProject = async (projectId, { title, startDate, endDate, totalDays, note }) => {
+    const { data, error } = await supabase
+        .from('projects')
+        .update({
+            title,
+            start_date: startDate,
+            end_date: endDate,
+            total_days: totalDays,
+            note
+        })
+        .eq('id', projectId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};

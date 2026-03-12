@@ -6,7 +6,7 @@ import { ScheduleBoard } from "../components/ScheduleBoard";
 import { toKoreanErrorMessage } from "../src/utils/errorMessages";
 
 
-export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, schedule = [], expandedProjId, setExpandedProjId, addScheduleItem }) => {
+export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, updateProject, schedule = [], expandedProjId, setExpandedProjId, addScheduleItem }) => {
   const scrollViewRef = useRef(null);
   const [cardLayouts, setCardLayouts] = useState({});
   const [statusFilter, setStatusFilter] = useState("전체");
@@ -126,7 +126,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formTitle.trim()) return;
 
     // Calculate days
@@ -138,18 +138,30 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, sche
       totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
 
-    const updatedProject = {
-      ...editingProject,
+    const updatedData = {
       title: formTitle,
-      members: formMembers,
-      note: formNote,
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
-      totalDays
+      totalDays,
+      note: formNote,
     };
 
-    setProjects(projects.map(p => p.id === editingProject.id ? updatedProject : p));
-    setEditModalVisible(false);
+    if (updateProject) {
+      const result = await updateProject(editingProject.id, updatedData);
+      if (result.success) {
+        setEditModalVisible(false);
+      } else {
+        Alert.alert("수정 실패", toKoreanErrorMessage(result.error, "프로젝트 정보를 수정하는 중 문제가 발생했습니다."));
+      }
+    } else {
+      // Fallback for demo
+      const updatedProject = {
+        ...editingProject,
+        ...updatedData
+      };
+      setProjects(projects.map(p => p.id === editingProject.id ? updatedProject : p));
+      setEditModalVisible(false);
+    }
   };
 
   const handleAddSchedule = async () => {

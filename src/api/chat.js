@@ -85,14 +85,34 @@ export const createChatRoom = async (projectId, name, memberIds) => {
 // 3. 채팅방의 이전 메시지 가져오기
 export const fetchMessages = async (roomId) => {
     try {
-        const { data, error } = await supabase
+        // 1. 메시지만 먼저 가져옵니다.
+        const { data: messages, error } = await supabase
             .from('messages')
             .select('*')
             .eq('room_id', roomId)
             .order('created_at', { ascending: true });
 
         if (error) throw error;
-        return data;
+        if (!messages || messages.length === 0) return [];
+
+        // 2. 메시지 작성자들의 고유 ID 목록을 추출합니다.
+        const senderIds = [...new Set(messages.map(m => m.sender_id))];
+
+        // 3. 해당 작성자들의 프로필 정보를 한 번에 가져옵니다.
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, nickname, avatar_url')
+            .in('id', senderIds);
+
+        // 4. 프로필 정보를 Map 형태로 변환 (조회 성능 최적화)
+        const profileMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+
+        // 5. 메시지 데이터에 프로필 정보를 합쳐서 반환합니다.
+        return messages.map(m => ({
+            ...m,
+            profiles: profileMap[m.sender_id] || null
+        }));
+
     } catch (error) {
         console.error('메시지 가져오기 오류:', error.message);
         throw error;

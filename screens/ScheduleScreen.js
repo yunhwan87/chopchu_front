@@ -8,7 +8,7 @@ import { searchUsers } from "../src/api/profiles";
 import { useAuth } from "../src/hooks/useAuth";
 
 
-export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, updateProject, schedule = [], expandedProjId, setExpandedProjId, addScheduleItem }) => {
+export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, updateProject, schedule = [], locations = [], expandedProjId, setExpandedProjId, addScheduleItem }) => {
   const scrollViewRef = useRef(null);
   const { user } = useAuth();
   const [cardLayouts, setCardLayouts] = useState({});
@@ -82,6 +82,8 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
   const [showSchedDatePicker, setShowSchedDatePicker] = useState(false);
   const [dayExpanded, setDayExpanded] = useState(false);
   const [statusExpanded, setStatusExpanded] = useState(false);
+  const [locExpanded, setLocExpanded] = useState(false); // 장소 드롭다운 상태 추가
+  const [selectedLocId, setSelectedLocId] = useState(null); // 선택된 장소 ID 추적
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -234,6 +236,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
     };
 
     const payload = {
+      locationId: selectedLocId, // 선택된 기존 장소 ID 포함
       title: schedTitle,
       status: mapStatusToDb(schedStatus),
       shooting_time: `${schedStartTime} ~ ${schedEndTime}`,
@@ -252,6 +255,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
         setSchedEndTime("11:00");
         setSchedDate(new Date());
         setSchedStatus("확정");
+        setSelectedLocId(null);
       } else {
         Alert.alert("저장 실패", toKoreanErrorMessage(result.error, "일정을 추가하는 중 문제가 발생했습니다."));
       }
@@ -702,7 +706,7 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
               <View style={[styles.premiumDetailCard, { padding: 16 }]}>
-                {/* 0. 소속 프로젝트 정보 (Readonly) */}
+                {/* 1. 소속 프로젝트 정보 (Readonly) */}
                 <View style={styles.premiumRow}>
                   <View style={styles.premiumLabelGroup}>
                     <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
@@ -715,60 +719,8 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
 
                 <View style={styles.premiumSeparator} />
 
-                {/* 1. 일정 제목 */}
-                <View style={styles.premiumRow}>
-                  <View style={styles.premiumLabelGroup}>
-                    <MapPin size={16} color="#6366F1" style={styles.premiumIcon} />
-                    <Text style={styles.premiumLabel}>일정 제목</Text>
-                  </View>
-                  <TextInput
-                    style={[styles.premiumValue, { flex: 1, textAlign: 'right', padding: 0 }]}
-                    value={schedTitle}
-                    onChangeText={setSchedTitle}
-                    placeholder="예: 에펠탑 촬영/점심 식사"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View style={styles.premiumSeparator} />
-
-                {/* 3. 날짜 설정 (일차 선택 시 자동 연동되지만 직접 수정도 가능) */}
-                <View style={styles.premiumRow}>
-                  <View style={styles.premiumLabelGroup}>
-                    <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
-                    <Text style={styles.premiumLabel}>날짜</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setShowSchedDatePicker(true)}>
-                    <Text style={styles.premiumValue}>{formatDate(schedDate)}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {showSchedDatePicker && (
-                  <View style={{ padding: 10 }}>
-                    <DateTimePicker
-                      value={schedDate}
-                      mode="date"
-                      display={Platform.OS === "ios" ? "spinner" : "default"}
-                      onChange={(event, selectedDate) => {
-                        if (Platform.OS === "android") setShowSchedDatePicker(false);
-                        if (selectedDate) setSchedDate(selectedDate);
-                      }}
-                    />
-                    {Platform.OS === "ios" && (
-                      <TouchableOpacity
-                        onPress={() => setShowSchedDatePicker(false)}
-                        style={{ padding: 10, alignItems: "center", backgroundColor: "#EEF2FF", borderRadius: 8 }}
-                      >
-                        <Text style={{ color: "#4F46E5", fontWeight: "700" }}>완료</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-
-                <View style={styles.premiumSeparator} />
-
-                {/* 0-1. 일차 선택 (Day Dropdown) */}
-                <View style={[styles.premiumRow, { zIndex: 110 }]}>
+                {/* 2. 일차 선택 (Day Dropdown) */}
+                <View style={[styles.premiumRow, { zIndex: 120 }]}>
                   <View style={styles.premiumLabelGroup}>
                     <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
                     <Text style={styles.premiumLabel}>일차 선택</Text>
@@ -778,13 +730,16 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
                       style={[styles.dropdownButton, { minWidth: 100, height: 32, paddingVertical: 0 }]}
                       onPress={() => {
                         setDayExpanded(!dayExpanded);
+                        setLocExpanded(false);
+                        setStatusExpanded(false);
                       }}
                     >
                       <Text style={styles.dropdownButtonText}>
                         {(() => {
                           const p = projects.find(proj => proj.id === expandedProjId);
                           if (!p?.startDate) return "1일차";
-                          return `${Math.floor((schedDate - new Date(p.startDate)) / (1000 * 60 * 60 * 24)) + 1}일차`;
+                          const diff = Math.floor((schedDate - new Date(p.startDate)) / (1000 * 60 * 60 * 24));
+                          return `${diff + 1}일차`;
                         })()}
                       </Text>
                       <ChevronDown size={14} color="#64748B" />
@@ -802,6 +757,11 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
                                   const newDate = new Date(p.startDate);
                                   newDate.setDate(newDate.getDate() + i);
                                   setSchedDate(newDate);
+                                  // 일차가 바뀌면 선택된 장소 초기화
+                                  setSchedTitle("");
+                                  setSchedStartTime("");
+                                  setSchedEndTime("");
+                                  setSchedStatus("확정");
                                 }
                                 setDayExpanded(false);
                               }}
@@ -817,65 +777,69 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
 
                 <View style={styles.premiumSeparator} />
 
-
-
-
-
-                {/* 4. 시간 설정 */}
-                <View style={styles.premiumRow}>
+                {/* 3. 장소 선택 (Dropdown) - 선택된 일차에 해당하는 장소만 표시 */}
+                <View style={[styles.premiumRow, { zIndex: 110 }]}>
                   <View style={styles.premiumLabelGroup}>
-                    <Clock size={16} color="#6366F1" style={styles.premiumIcon} />
-                    <Text style={styles.premiumLabel}>진행 시간</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TextInput
-                      style={[styles.premiumValue, styles.timeInputSmall]}
-                      value={schedStartTime}
-                      onChangeText={setSchedStartTime}
-                      placeholder="09:00"
-                      keyboardType="numbers-and-punctuation"
-                    />
-                    <Text style={{ marginHorizontal: 4, color: '#64748B' }}>~</Text>
-                    <TextInput
-                      style={[styles.premiumValue, styles.timeInputSmall]}
-                      value={schedEndTime}
-                      onChangeText={setSchedEndTime}
-                      placeholder="11:00"
-                      keyboardType="numbers-and-punctuation"
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.premiumSeparator} />
-
-                {/* 4-1. 섭외 상태 */}
-                <View style={[styles.premiumRow, { zIndex: 100 }]}>
-                  <View style={styles.premiumLabelGroup}>
-                    <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
-                    <Text style={styles.premiumLabel}>섭외 상태</Text>
+                    <MapPin size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>장소 선택</Text>
                   </View>
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <TouchableOpacity
-                      style={[styles.dropdownButton, { minWidth: 100, height: 32, paddingVertical: 0 }]}
+                      style={[styles.dropdownButton, { minWidth: 150, height: 32, paddingVertical: 0 }]}
                       onPress={() => {
-                        setStatusExpanded(!statusExpanded);
+                        setLocExpanded(!locExpanded);
                         setDayExpanded(false);
+                        setStatusExpanded(false);
                       }}
                     >
-                      <Text style={styles.dropdownButtonText}>{schedStatus}</Text>
+                      <Text style={[styles.dropdownButtonText, { flex: 1 }]} numberOfLines={1}>
+                        {schedTitle || "장소를 선택하세요"}
+                      </Text>
                       <ChevronDown size={14} color="#64748B" />
                     </TouchableOpacity>
-                    {statusExpanded && (
-                      <View style={[styles.dropdownMenu, { top: 35, right: 0, minWidth: 100 }]}>
-                        {["진행 중", "확정", "취소"].map(st => (
-                          <TouchableOpacity
-                            key={st}
-                            style={styles.dropdownItem}
-                            onPress={() => { setSchedStatus(st); setStatusExpanded(false); }}
-                          >
-                            <Text style={[styles.dropdownItemText, schedStatus === st && styles.dropdownItemTextActive]}>{st}</Text>
-                          </TouchableOpacity>
-                        ))}
+                    {locExpanded && (
+                      <View style={[styles.dropdownMenu, { top: 35, right: 0, minWidth: 200, maxHeight: 200 }]}>
+                        <ScrollView nestedScrollEnabled={true}>
+                          {locations
+                            .filter(l => (l.project_id === expandedProjId || !l.project_id))
+                            .filter(l => (l.location_date || l.date) === formatDate(schedDate)) // 선택된 날짜와 일치하는 장소만 필터링
+                            .map(loc => (
+                              <TouchableOpacity
+                                key={loc.id}
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                  setSchedTitle(loc.name || loc.title || "");
+                                  setSelectedLocId(loc.id); // 장소 ID 저장
+                                  if (loc.shooting_time || loc.startTime) {
+                                    const timeStr = loc.shooting_time || `${loc.startTime} ~ ${loc.endTime}`;
+                                    if (timeStr.includes("~")) {
+                                      const [start, end] = timeStr.split("~").map(s => s.trim());
+                                      setSchedStartTime(start);
+                                      setSchedEndTime(end);
+                                    } else {
+                                      setSchedStartTime(loc.startTime || "09:00");
+                                      setSchedEndTime(loc.endTime || "11:00");
+                                    }
+                                  }
+                                  setSchedStatus(loc.status === 'confirmed' ? "확정" : "진행 중");
+                                  setSchedNote(loc.note || loc.memo || "");
+                                  setLocExpanded(false);
+                                }}
+                              >
+                                <View>
+                                  <Text style={styles.dropdownItemText}>{loc.name || loc.title}</Text>
+                                  <Text style={{ fontSize: 10, color: '#94A3B8' }}>{loc.shooting_time || `${loc.startTime}~${loc.endTime}` || "시간 미정"}</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          {locations
+                            .filter(l => (l.project_id === expandedProjId || !l.project_id))
+                            .filter(l => (l.location_date || l.date) === formatDate(schedDate)).length === 0 && (
+                              <View style={{ padding: 12, alignItems: 'center' }}>
+                                <Text style={{ color: '#94A3B8', fontSize: 12 }}>해당 일차에 등록된 장소가 없습니다.</Text>
+                              </View>
+                            )}
+                        </ScrollView>
                       </View>
                     )}
                   </View>
@@ -883,7 +847,48 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
 
                 <View style={styles.premiumSeparator} />
 
-                {/* 5. 비고 */}
+                {/* 4. 날짜 (Readonly - 일차와 연동됨) */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>날짜</Text>
+                  </View>
+                  <Text style={[styles.premiumValue, { color: '#64748B' }]}>{formatDate(schedDate)}</Text>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 5. 진행 시간 (Readonly) */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <Clock size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>진행 시간</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.premiumValue, { color: '#64748B' }]}>
+                      {schedStartTime || "미정"} ~ {schedEndTime || "미정"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 6. 섭외 상태 (Readonly) */}
+                <View style={styles.premiumRow}>
+                  <View style={styles.premiumLabelGroup}>
+                    <AlertCircle size={16} color="#6366F1" style={styles.premiumIcon} />
+                    <Text style={styles.premiumLabel}>섭외 상태</Text>
+                  </View>
+                  <View style={[styles.statusBadge, schedStatus === "확정" ? styles.statusConfirmed : styles.statusPending]}>
+                    <Text style={[styles.statusBadgeText, schedStatus === "확정" ? styles.statusTextConfirmed : styles.statusTextPending]}>
+                      {schedStatus}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.premiumSeparator} />
+
+                {/* 7. 메모 사항 */}
                 <View style={{ paddingVertical: 12 }}>
                   <View style={[styles.premiumLabelGroup, { marginBottom: 8 }]}>
                     <ClipboardList size={16} color="#6366F1" style={styles.premiumIcon} />

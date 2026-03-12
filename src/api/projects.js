@@ -107,10 +107,25 @@ export const deleteProject = async (projectId) => {
 };
 
 /**
- * 프로젝트 정보 수정
+ * 프로젝트 정보 수정 및 멤버 동기화
  */
-export const updateProject = async (projectId, { title, startDate, endDate, totalDays, note }) => {
-    const { data, error } = await supabase
+export const updateProject = async (projectId, { title, startDate, endDate, totalDays, note, memberIds = [] }) => {
+    console.log(`[API] updateProject called for ID: ${projectId}`, { title, memberIds });
+
+    // 0. 권한 및 존재 여부 우선 확인
+    const { data: currentProj, error: currentFetchError } = await supabase
+        .from('projects')
+        .select('id, created_by')
+        .eq('id', projectId)
+        .single();
+
+    if (currentFetchError) {
+        console.error('[API] Error finding project before update:', currentFetchError);
+    }
+
+    // 1. 기본 프로젝트 정보 업데이트 시도
+    console.log('[API] Step 1: Updating projects table...');
+    const { data: updateData, error: projectError } = await supabase
         .from('projects')
         .update({
             title,
@@ -120,9 +135,103 @@ export const updateProject = async (projectId, { title, startDate, endDate, tota
             note
         })
         .eq('id', projectId)
-        .select()
+        .select();
+
+    let projectInfoSuccess = false;
+    let project = currentProj; // 기본값은 기존 정보
+
+    if (projectError) {
+        console.error('[API] Project Info Update DB Error:', projectError);
+    } else if (updateData && updateData.length > 0) {
+        console.log('[API] Project details updated successfully');
+        projectInfoSuccess = true;
+        project = updateData[0];
+    } else {
+        console.warn('[API] Project table update affected 0 rows (Check RLS)');
+    }
+
+    // 2. 멤버 리스트 동기화 시도 (프로젝트가 존재하면 무조건 시도)
+    console.log(`[API] Step 2: Syncing members for project ${projectId}. New memberIds:`, memberIds);
+
+    const { data: existingMembers, error: fetchError } = await supabase
+        .from('project_members')
+        .select('user_id, role')
+        .eq('project_id', projectId);
+
+    let memberSyncSuccess = true;
+
+    if (fetchError) {
+        console.error('[API] Error fetching existing members:', fetchError);
+        memberSyncSuccess = false;
+    } else {
+        const existingUserIds = existingMembers.map(m => m.user_id);
+        const ownerId = existingMembers.find(m => m.role === 'owner')?.user_id;
+        const ownerFromProj = currentProj?.created_by;
+
+        // 추가할 멤버 (기존에 없던 멤버)
+        const membersToAdd = memberIds.filter(id => !existingUserIds.includes(id));
+        
+        // 삭제할 멤버 (기본 멤버 리스트에 없는데 DB에는 있는 멤버, 단 owner/방장 제외)
+        const membersToRemove = existingUserIds.filter(id => 
+            !memberIds.includes(id) && id !== ownerId && id !== ownerFromProj
+        );
+
+        console.log(`[API] Members to add:`, membersToAdd);
+        console.log(`[API] Members to remove:`, membersToRemove);
+
+        // 신규 멤버 추가
+        if (membersToAdd.length > 0) {
+            const { error: insertError } = await supabase.from('project_members').insert(
+                membersToAdd.map(userId => ({
+                    project_id: projectId,
+                    user_id: userId,
+                    role: 'member'
+                }))
+            );
+            if (insertError) {
+                console.error('[API] Member Insert Error:', insertError);
+                memberSyncSuccess = false;
+            } else {
+                console.log('[API] Member Insert Success');
+            }
+        }
+
+        // 제거된 멤버 삭제
+        if (membersToRemove.length > 0) {
+            const { error: deleteError } = await supabase.from('project_members')
+                .delete()
+                .eq('project_id', projectId)
+                .in('user_id', membersToRemove);
+            if (deleteError) {
+                console.error('[API] Member Delete Error:', deleteError);
+                memberSyncSuccess = false;
+            } else {
+                console.log('[API] Member Delete Success');
+            }
+        }
+    }
+
+    // 3. 최신 데이터 재조회 (멤버 정보 포함)
+    const { data: finalProject, error: finalError } = await supabase
+        .from('projects')
+        .select(`
+            *,
+            all_members:project_members (
+                user_id,
+                role,
+                profiles (nickname, email)
+            )
+        `)
+        .eq('id', projectId)
         .single();
 
-    if (error) throw error;
-    return data;
+    if (finalError) {
+        console.error('[API] Error fetching final project data:', finalError);
+    }
+
+    return {
+        ...(finalProject || project),
+        infoUpdated: projectInfoSuccess,
+        membersSynced: memberSyncSuccess
+    };
 };

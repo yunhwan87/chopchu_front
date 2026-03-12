@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, Platform, Alert } from "react-native";
-import { Edit2, X, Trash2, ChevronDown, Plus, MapPin, AlertCircle, Calendar, Clock, ClipboardList, Search } from "lucide-react-native";
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, Platform, Alert, ActivityIndicator } from "react-native";
+import { Edit2, X, Trash2, ChevronDown, Plus, MapPin, AlertCircle, Calendar, Clock, ClipboardList, Search, UserPlus } from "lucide-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { ScheduleBoard } from "../components/ScheduleBoard";
 import { toKoreanErrorMessage } from "../src/utils/errorMessages";
+import { searchUsers } from "../src/api/profiles";
+import { useAuth } from "../src/hooks/useAuth";
 
 
 export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, updateProject, schedule = [], expandedProjId, setExpandedProjId, addScheduleItem }) => {
   const scrollViewRef = useRef(null);
+  const { user } = useAuth();
   const [cardLayouts, setCardLayouts] = useState({});
   const [statusFilter, setStatusFilter] = useState("전체");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -83,20 +86,71 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
 
-  const [formTitle, setFormTitle] = useState("");
-  const [formMembers, setFormMembers] = useState("");
-  const [formNote, setFormNote] = useState("");
+  // 멤버 검색 및 선택 상태
+  const [memberQuery, setMemberQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [searching, setSearching] = useState(false);
 
+  // 프로젝트 수정 폼 상태
+  const [formTitle, setFormTitle] = useState("");
+  const [formNote, setFormNote] = useState("");
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [pickerType, setPickerType] = useState("start");
 
+  // 사용자 검색 로직 (0.5초 디바운싱)
+  useEffect(() => {
+    const currentQuery = memberQuery.trim();
+    if (currentQuery.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        console.log(`[EditSearch] Requesting API for: "${currentQuery}"`);
+        const results = await searchUsers(currentQuery);
+        if (currentQuery !== memberQuery.trim()) return;
+
+        // 현재 로그인한 본인 및 이미 선택된 멤버 제외
+        const filtered = results.filter(r => {
+          const isAlreadySelected = selectedMembers.some(sm => sm.id === r.id);
+          const isMe = r.id === user?.id;
+          return !isAlreadySelected && !isMe;
+        });
+
+        setSearchResults(filtered);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [memberQuery, selectedMembers]);
+
   const openEditModal = (proj) => {
     setEditingProject(proj);
     setFormTitle(proj.title);
-    setFormMembers(proj.members || "");
     setFormNote(proj.note || "");
+
+    // 참여 멤버 초기화 (all_members 데이터를 selectedMembers 형식으로 변환)
+    if (proj.all_members) {
+      const initialMembers = proj.all_members.map(m => ({
+        id: m.user_id,
+        email: m.profiles?.email,
+        nickname: m.profiles?.nickname
+      }));
+      setSelectedMembers(initialMembers);
+    } else {
+      setSelectedMembers([]);
+    }
+    setMemberQuery("");
 
     // Parse dates
     const startObj = proj.startDate ? new Date(proj.startDate) : new Date();
@@ -144,7 +198,10 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
       endDate: formatDate(endDate),
       totalDays,
       note: formNote,
+      memberIds: selectedMembers.map(m => m.id), // 수정된 멤버 ID 리스트 추가
     };
+
+    console.log(`[Edit] Attempting to update project ${editingProject?.id}:`, updatedData);
 
     if (updateProject) {
       const result = await updateProject(editingProject.id, updatedData);
@@ -286,14 +343,14 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
                   </View>
                 </View>
 
-                {proj.members ? (
+                {proj.all_members && proj.all_members.length > 0 ? (
                   <View style={styles.detailSubTextRow}>
                     <Text style={[styles.detailSubText, { flex: 1, marginBottom: 0 }]} numberOfLines={1}>
-                      참여 인원: {proj.members}
+                      참여 인원: {proj.all_members.map(m => m.profiles?.nickname || m.profiles?.email || 'Unknown').join(', ')}
                     </Text>
                     <View style={styles.inlineBadge}>
                       <Text style={styles.inlineBadgeText}>
-                        총 {proj.members.split(',').filter(m => m.trim().length > 0).length}명
+                        총 {proj.all_members.length}명
                       </Text>
                     </View>
                   </View>
@@ -493,14 +550,81 @@ export const ScheduleScreen = ({ projects = [], setProjects, deleteProject, upda
                 placeholderTextColor="#9CA3AF"
               />
 
-              <Text style={styles.label}>참여 인원</Text>
-              <TextInput
-                style={styles.input}
-                value={formMembers}
-                onChangeText={setFormMembers}
-                placeholder="이름을 콤마(,)로 구분"
-                placeholderTextColor="#9CA3AF"
-              />
+              <Text style={styles.label}>참여 인원 검색</Text>
+              <View style={styles.searchWrapper}>
+                <Search size={18} color="#94A3B8" />
+                <TextInput
+                  style={styles.searchField}
+                  placeholder="이름 또는 이메일 검색"
+                  placeholderTextColor="#94A3B8"
+                  value={memberQuery}
+                  onChangeText={setMemberQuery}
+                />
+                {searching && <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 8 }} />}
+              </View>
+
+              {/* 검색 결과 리스트 */}
+              {searching ? (
+                <View style={styles.searchingStatus}>
+                  <ActivityIndicator size="small" color="#4F46E5" />
+                  <Text style={styles.searchingText}>사용자 찾는 중...</Text>
+                </View>
+              ) : memberQuery.length >= 2 ? (
+                searchResults.length > 0 ? (
+                  <View style={styles.searchResultsContainer}>
+                    {searchResults.map((u) => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={styles.searchItem}
+                        onPress={() => {
+                          setSelectedMembers([...selectedMembers, u]);
+                          setMemberQuery("");
+                          setSearchResults([]);
+                        }}
+                      >
+                        <View style={styles.avatarMini}>
+                          <Text style={styles.avatarTextMini}>{u.nickname?.[0] || "U"}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.searchItemName}>{u.nickname || "Unknown"}</Text>
+                          <Text style={styles.searchItemEmail}>{u.email}</Text>
+                        </View>
+                        <UserPlus size={18} color="#4F46E5" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptySearchContainer}>
+                    <Text style={styles.emptySearchText}>검색 결과가 없습니다.</Text>
+                  </View>
+                )
+              ) : null}
+
+              {/* 선택된 멤버 태그Cloud */}
+              {selectedMembers.length > 0 && (
+                <View style={styles.tagCloud}>
+                  {selectedMembers.map((m) => {
+                    // 프로젝트 생성자(owner)는 삭제 버튼 표시 안 함 (옵션)
+                    const isOwner = editingProject?.created_by === m.id;
+                    return (
+                      <View key={m.id} style={[styles.memberTag, isOwner && { backgroundColor: '#94A3B8' }]}>
+                        <Text style={styles.memberTagText}>
+                          {m.nickname || m.email}{isOwner ? ' (Owner)' : ''}
+                        </Text>
+                        {!isOwner && (
+                          <TouchableOpacity
+                            onPress={() =>
+                              setSelectedMembers(selectedMembers.filter((sm) => sm.id !== m.id))
+                            }
+                          >
+                            <X size={14} color="#FFF" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
 
               <Text style={styles.label}>기간 설정</Text>
               <View style={styles.dateRow}>
@@ -1196,5 +1320,109 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 2,
     fontSize: 14,
+  },
+  // 신규 멤버 관리 스타일
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    marginBottom: 12,
+  },
+  searchField: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 15,
+    color: '#1E293B',
+  },
+  searchingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  searchingText: {
+    marginLeft: 8,
+    color: '#6366F1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  searchResultsContainer: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  searchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  avatarMini: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarTextMini: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  searchItemName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  searchItemEmail: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  emptySearchContainer: {
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  emptySearchText: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
+  tagCloud: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  memberTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  memberTagText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

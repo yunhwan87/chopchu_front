@@ -65,7 +65,26 @@ export const createProject = async ({ title, startDate, endDate, totalDays, note
         }
     }
 
-    return project;
+    // 3. 생성된 프로젝트의 전체 정보 및 멤버 목록 재조회
+    const { data: finalProject, error: finalError } = await supabase
+        .from('projects')
+        .select(`
+            *,
+            all_members:project_members (
+                user_id,
+                role,
+                profiles (nickname, email)
+            )
+        `)
+        .eq('id', project.id)
+        .single();
+
+    if (finalError) {
+        console.error('Error fetching final project data:', finalError);
+        return project; // 실패 시 최소한 기본 정보는 반환
+    }
+
+    return finalProject;
 };
 
 /**
@@ -117,12 +136,12 @@ export const deleteProject = async (projectId) => {
         const itineraryIds = itineraries?.map(i => i.id) || [];
 
         // 2. 최하위 자식 테이블 데이터 삭제 (Foreign Key 제약 조건 순서 고려)
-        
+
         // 2-1. 일정 관련 하위 데이터
         if (itineraryIds.length > 0) {
             await supabase.from('itinery_locations').delete().in('itinery_id', itineraryIds);
         }
-        
+
         // 2-2. 장소 관련 하위 데이터
         if (locationIds.length > 0) {
             await Promise.all([
@@ -231,9 +250,9 @@ export const updateProject = async (projectId, { title, startDate, endDate, tota
 
         // 추가할 멤버 (기존에 없던 멤버)
         const membersToAdd = memberIds.filter(id => !existingUserIds.includes(id));
-        
+
         // 삭제할 멤버 (기본 멤버 리스트에 없는데 DB에는 있는 멤버, 단 owner/방장 제외)
-        const membersToRemove = existingUserIds.filter(id => 
+        const membersToRemove = existingUserIds.filter(id =>
             !memberIds.includes(id) && id !== ownerId && id !== ownerFromProj
         );
 

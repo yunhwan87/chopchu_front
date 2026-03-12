@@ -217,7 +217,7 @@ export const LocationScreen = ({
     const name = String(item.managerName || "").trim();
     const phone = String(item.managerPhone || "").trim();
     const email = String(item.managerEmail || "").trim();
-    
+
     if (!name && !phone && !email) return [];
     return [{ name, phone, email }];
   };

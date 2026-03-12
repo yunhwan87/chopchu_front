@@ -121,15 +121,24 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
     if (!currentProject?.id) return { success: false, error: '선택된 프로젝트가 없습니다.' };
 
     try {
-      await locationApi.createLocation({
-        ...payload,
-        project_id: currentProject.id,
-      });
+      const { locationId, ...data } = payload;
+
+      if (locationId) {
+        // 이미 존재하는 장소인 경우 업데이트 (중복 생성 방지)
+        await locationApi.updateLocation(locationId, data);
+      } else {
+        // 새 장소인 경우 생성 (현재 UI에서는 사실상 발생하지 않음)
+        await locationApi.createLocation({
+          ...data,
+          project_id: currentProject.id,
+        });
+      }
+
       // 저장 후 목록 갱신
       await syncScheduleFromLocations();
       return { success: true };
     } catch (err) {
-      console.error('Error adding schedule item:', err);
+      console.error('Error adding/updating schedule item:', err);
       return { success: false, error: err.message };
     }
   };
@@ -164,6 +173,7 @@ function MainContent({ onLogout, currentProject, onBackToProjects, currentUserNa
             deleteProject={deleteProject}
             updateProject={updateProject}
             schedule={schedule}
+            locations={locations} // 섭외 장소 목록 전달
             expandedProjId={expandedProjId}
             setExpandedProjId={setExpandedProjId}
             addScheduleItem={addScheduleItem}

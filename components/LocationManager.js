@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -821,7 +821,7 @@ export const LocationManager = ({
                     <Text style={styles.locSubText}>
                       {loc.date}
                       {loc.startTime && loc.endTime
-                        ? ` · ${loc.startTime}~${loc.endTime}`
+                        ? `\n${loc.startTime}~${loc.endTime}`
                         : ""}
                     </Text>
                   ) : null}
@@ -840,8 +840,8 @@ export const LocationManager = ({
                 {/* 답변 차례 배지 추가 */}
                 <View
                   style={[
-                    styles.badge, 
-                    { 
+                    styles.badge,
+                    {
                       backgroundColor: loc.cardStatus === 'coordinator_pending' ? '#FEF3C7' : loc.cardStatus === 'crew_pending' ? '#D1FAE5' : '#F1F5F9',
                       borderColor: loc.cardStatus === 'coordinator_pending' ? '#F59E0B' : loc.cardStatus === 'crew_pending' ? '#10B981' : '#94A3B8',
                       borderWidth: 0.5
@@ -849,7 +849,7 @@ export const LocationManager = ({
                   ]}
                 >
                   <Text style={[
-                    styles.badgeText, 
+                    styles.badgeText,
                     { color: loc.cardStatus === 'coordinator_pending' ? '#B45309' : loc.cardStatus === 'crew_pending' ? '#065F46' : '#64748B' }
                   ]}>
                     {loc.cardStatus === 'coordinator_pending' ? '코디 차례' : loc.cardStatus === 'crew_pending' ? '제작진 차례' : '섭외지 답변 대기'}
@@ -948,7 +948,7 @@ export const LocationManager = ({
                           <User size={16} color="#6366F1" style={styles.premiumIcon} />
                           <Text style={styles.premiumLabel}>답변 차례</Text>
                         </View>
-                        <View style={{ 
+                        <View style={{
                           backgroundColor: selectedLoc.cardStatus === 'coordinator_pending' ? '#FEF3C7' : selectedLoc.cardStatus === 'crew_pending' ? '#D1FAE5' : '#F1F5F9',
                           paddingHorizontal: 8,
                           paddingVertical: 2,
@@ -956,10 +956,10 @@ export const LocationManager = ({
                           borderWidth: 0.5,
                           borderColor: selectedLoc.cardStatus === 'coordinator_pending' ? '#F59E0B' : selectedLoc.cardStatus === 'crew_pending' ? '#10B981' : '#94A3B8',
                         }}>
-                          <Text style={{ 
-                            fontSize: 12, 
+                          <Text style={{
+                            fontSize: 12,
                             fontWeight: '700',
-                            color: selectedLoc.cardStatus === 'coordinator_pending' ? '#B45309' : selectedLoc.cardStatus === 'crew_pending' ? '#065F46' : '#64748B' 
+                            color: selectedLoc.cardStatus === 'coordinator_pending' ? '#B45309' : selectedLoc.cardStatus === 'crew_pending' ? '#065F46' : '#64748B'
                           }}>
                             {selectedLoc.cardStatus === 'coordinator_pending' ? '코디 차례' : selectedLoc.cardStatus === 'crew_pending' ? '제작진 차례' : '섭외지 답변 대기'}
                           </Text>
@@ -1008,7 +1008,7 @@ export const LocationManager = ({
                           </View>
                         ) : null}
                         {selectedLoc.managerName && (selectedLoc.managerPhone || selectedLoc.managerEmail) && <View style={styles.premiumSeparator} />}
-                        
+
                         {selectedLoc.managerPhone ? (
                           <View style={styles.premiumRow}>
                             <View style={styles.premiumLabelGroup}>
@@ -1042,7 +1042,7 @@ export const LocationManager = ({
                               <Text style={styles.premiumValue}>₩ {Number(selectedLoc.cost).toLocaleString("ko-KR")}</Text>
                             </View>
                             <View style={styles.premiumSeparator} />
-                            
+
                             {selectedLoc.depositAmount && selectedLoc.depositAmount !== "0.00" && selectedLoc.depositAmount !== 0 ? (
                               <>
                                 <View style={styles.premiumRow}>
@@ -1252,17 +1252,17 @@ export const LocationManager = ({
 
                 <View style={styles.premiumSeparator} />
 
-                {/* 4. 촬영 일시 (촬영일자) */}
+                {/* 4. 촬영 일자 */}
                 <View style={styles.premiumRow}>
                   <View style={styles.premiumLabelGroup}>
                     <Calendar size={16} color="#6366F1" style={styles.premiumIcon} />
-                    <Text style={styles.premiumLabel}>촬영일시</Text>
+                    <Text style={styles.premiumLabel}>촬영일자</Text>
                   </View>
                   <TouchableOpacity
                     style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}
                     onPress={() => setShowDatePicker(true)}
                   >
-                    <Text style={[styles.premiumValue, { color: formDate ? "#1E293B" : "#9CA3AF" }]}>
+                    <Text style={[styles.premiumValue, { color: formDate ? "#1E293B" : "#9CA3AF", textAlign: 'right', fontWeight: 900, marginLeft: 0, flex: 0 }]}>
                       {formDate || "날짜 선택"}
                     </Text>
                   </TouchableOpacity>
@@ -1433,13 +1433,13 @@ export const LocationManager = ({
                   </View>
                   <View style={{ minHeight: 120, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 1, borderRadius: 8, padding: 8 }}>
                     <TextInput
-                      style={{ 
-                        flex: 1, 
-                        fontSize: 14, 
-                        color: '#334155', 
-                        textAlign: 'left', 
-                        minHeight: 100, 
-                        padding: 4 
+                      style={{
+                        flex: 1,
+                        fontSize: 14,
+                        color: '#334155',
+                        textAlign: 'left',
+                        minHeight: 100,
+                        padding: 4
                       }}
                       value={formMemo}
                       onChangeText={setFormMemo}

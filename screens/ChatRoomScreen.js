@@ -50,15 +50,36 @@ export const ChatRoomScreen = ({ room, project, onBack }) => {
                 schema: 'public',
                 table: 'messages',
                 filter: `room_id=eq.${room.id}`
-            }, (payload) => {
-                // 새로 들어온 메시지를 상태에 추가 (본인이 보낸 메시지는 로컬에서 먼저 추가할 수 있으므로 중복 체크 필요)
+            }, async (payload) => {
                 const newMessage = payload.new;
+
+                // 이미 메시지가 있는지 확인
                 setMessages(prev => {
                     if (prev.find(m => m.id === newMessage.id)) return prev;
+                    return prev; // 일단 그대로 반환하고 아래에서 profile과 함께 추가
+                });
 
-                    // 작성자 정보를 위해 다시 fetch하거나 현재 캐시된 정보 활용
-                    // 이 예제에서는 간략하게 로컬에 추가
-                    return [...prev, newMessage];
+                // 작성자 정보 가져오기
+                let profileData = null;
+                try {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('nickname, avatar_url')
+                        .eq('id', newMessage.sender_id)
+                        .single();
+                    profileData = data;
+                } catch (error) {
+                    console.error('실시간 메시지 프로필 로드 실패:', error);
+                }
+
+                const messageWithProfile = {
+                    ...newMessage,
+                    profiles: profileData
+                };
+
+                setMessages(prev => {
+                    if (prev.find(m => m.id === newMessage.id)) return prev;
+                    return [...prev, messageWithProfile];
                 });
 
                 setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
